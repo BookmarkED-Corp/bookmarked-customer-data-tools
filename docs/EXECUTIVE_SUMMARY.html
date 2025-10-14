@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Data Tools - Executive Summary</title>
+    <style>
+        @media print {
+            body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+            .no-print { display: none; }
+            .page-break { page-break-after: always; }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: white;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #183162 0%, #15b79e 100%);
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .header .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .header .date {
+            margin-top: 1rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .status-banner {
+            background: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            border-radius: 4px;
+        }
+
+        .status-banner strong {
+            color: #155724;
+        }
+
+        .section {
+            margin-bottom: 3rem;
+        }
+
+        .section-title {
+            color: #183162;
+            font-size: 1.8rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid #ff6227;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #15b79e 0%, #12a38c 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card.orange {
+            background: linear-gradient(135deg, #ff6227 0%, #e55520 100%);
+        }
+
+        .stat-card.blue {
+            background: linear-gradient(135deg, #183162 0%, #0f2345 100%);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+        }
+
+        .stat-card .value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .key-deliverables {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .key-deliverables h3 {
+            color: #183162;
+            margin-bottom: 1rem;
+        }
+
+        .key-deliverables ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .key-deliverables li {
+            padding: 0.5rem 0;
+            padding-left: 1.5rem;
+            position: relative;
+        }
+
+        .key-deliverables li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: #15b79e;
+            font-weight: 700;
+        }
+
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin: 1.5rem 0;
+        }
+
+        .tool-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .tool-card h4 {
+            color: #183162;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .tool-card .icon {
+            font-size: 1.5rem;
+        }
+
+        .tool-card p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .architecture-diagram {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+
+        .architecture-diagram pre {
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #333;
+            overflow-x: auto;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 2rem;
+            text-align: center;
+            margin-top: 3rem;
+            border-top: 3px solid #ff6227;
+        }
+
+        .print-button {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: #ff6227;
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(255, 98, 39, 0.3);
+            transition: all 0.3s;
+        }
+
+        .print-button:hover {
+            background: #e55520;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(255, 98, 39, 0.4);
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1.5rem 0;
+        }
+
+        .feature-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 6px;
+            border-left: 3px solid #15b79e;
+        }
+
+        .feature-item .title {
+            font-weight: 700;
+            color: #183162;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-button no-print" onclick="window.print()">🖨️ Print / Save PDF</button>
+
+    <div class="header">
+        <h1>Customer Data Tools</h1>
+        <div class="subtitle">Executive Summary - Diagnostic & Troubleshooting Platform</div>
+        <div class="date">Updated: October 14, 2025 | Target Launch: November 2025</div>
+    </div>
+
+    <div class="container">
+        <div class="status-banner">
+            <strong>Current Status:</strong> ✅ Project Foundation Complete - Ready for Development
+        </div>
+
+        <!-- Overview Section -->
+        <div class="section">
+            <h2 class="section-title">Project Overview</h2>
+            <p style="font-size: 1.1rem; color: #555; margin-bottom: 1.5rem;">
+                The Customer Data Tools platform streamlines customer support by providing diagnostic tools to quickly identify
+                and resolve data discrepancies between SIS systems (ClassLink/OneRoster) and the Bookmarked platform. This tool
+                eliminates manual database queries and provides actionable remediation suggestions.
+            </p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Target Deployment</h3>
+                    <div class="value">AWS</div>
+                    <p style="font-size: 0.9rem; opacity: 0.9;">Lambda or ECS Fargate</p>
+                </div>
+                <div class="stat-card orange">
+                    <h3>Initial Tool Set</h3>
+                    <div class="value">4</div>
+                    <p style="font-size: 0.9rem; opacity: 0.9;">Diagnostic Tools</p>
+                </div>
+                <div class="stat-card blue">
+                    <h3>Expected Impact</h3>
+                    <div class="value">50%</div>
+                    <p style="font-size: 0.9rem; opacity: 0.9;">Reduction in Resolution Time</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Data Sources</h3>
+                    <div class="value">5+</div>
+                    <p style="font-size: 0.9rem; opacity: 0.9;">Integration Points</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagnostic Tools Section -->
+        <div class="section">
+            <h2 class="section-title">Core Diagnostic Tools</h2>
+
+            <div class="tool-grid">
+                <div class="tool-card">
+                    <h4><span class="icon">👨‍👩‍👧</span> Student Mismatch Resolver</h4>
+                    <p>
+                        Diagnose incorrect student assignments to parent accounts by comparing source data
+                        (ClassLink/OneRoster) with Bookmarked production data.
+                    </p>
+                    <p style="margin-top: 0.75rem; font-weight: 600; color: #ff6227;">
+                        Status: ISSUE_IN_SOURCE | ISSUE_IN_PROD | NO_ISSUE
+                    </p>
+                </div>
+
+                <div class="tool-card">
+                    <h4><span class="icon">🔍</span> Missing Data Finder</h4>
+                    <p>
+                        Identify missing students, classes, or enrollments by validating presence across
+                        source systems and Bookmarked databases.
+                    </p>
+                    <p style="margin-top: 0.75rem; font-weight: 600; color: #ff6227;">
+                        Detects: Students, Classes, Teachers, Enrollments
+                    </p>
+                </div>
+
+                <div class="tool-card">
+                    <h4><span class="icon">⚠️</span> Parent Email Conflicts</h4>
+                    <p>
+                        Detect and resolve conflicts when multiple parents share the same email address,
+                        preventing data overwrites and privacy issues.
+                    </p>
+                    <p style="margin-top: 0.75rem; font-weight: 600; color: #ff6227;">
+                        Critical: FERPA Compliance
+                    </p>
+                </div>
+
+                <div class="tool-card">
+                    <h4><span class="icon">🏫</span> Campus Transfer Validator</h4>
+                    <p>
+                        Validate proper relationship cleanup when students transfer between campuses,
+                        preventing phantom enrollments.
+                    </p>
+                    <p style="margin-top: 0.75rem; font-weight: 600; color: #ff6227;">
+                        Checks: Old/New Campus Relationships
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Architecture Section -->
+        <div class="section">
+            <h2 class="section-title">System Architecture</h2>
+
+            <div class="architecture-diagram">
+                <pre>
+┌─────────────────────────────────────────────────────────────┐
+│                     USER INTERFACE                          │
+│                   Flask Web Application                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │Dashboard │  │  Tools   │  │ Settings │  │ HubSpot  │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  APPLICATION LAYER                          │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  Diagnostic Tools (Extensible Plugin Architecture) │    │
+│  │  • StudentMismatchTool                             │    │
+│  │  • MissingDataTool                                 │    │
+│  │  • ParentConflictTool                              │    │
+│  │  • CampusTransferTool                              │    │
+│  └────────────────────────────────────────────────────┘    │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 DATA CONNECTOR LAYER                        │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │Bookmarked│  │ClassLink │  │OneRoster │  │ HubSpot  │   │
+│  │ API/DB   │  │   API    │  │ API/CSV  │  │   API    │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    DATA SOURCES                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │  Bookmarked  │  │  SIS Systems │  │   HubSpot    │      │
+│  │  Production  │  │  (ClassLink/ │  │   Tickets    │      │
+│  │   Staging    │  │  OneRoster)  │  │              │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                </pre>
+            </div>
+        </div>
+
+        <!-- Key Features Section -->
+        <div class="section">
+            <h2 class="section-title">Key Features</h2>
+
+            <div class="feature-list">
+                <div class="feature-item">
+                    <div class="title">Multi-Environment Access</div>
+                    <div>Switch between staging and production environments dynamically</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">Customer Integration Management</div>
+                    <div>Store ClassLink, OneRoster, and FTP configurations per customer</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">HubSpot Integration</div>
+                    <div>Link diagnostic results directly to support tickets</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">Secure Credential Storage</div>
+                    <div>Encrypted credentials in AWS Secrets Manager</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">Read-Only Database Access</div>
+                    <div>Zero risk of modifying production data</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">Extensible Tool Framework</div>
+                    <div>Easy to add new diagnostic tools as needs arise</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">Automated Diagnostics</div>
+                    <div>Compare source data vs. production data automatically</div>
+                </div>
+
+                <div class="feature-item">
+                    <div class="title">Remediation Suggestions</div>
+                    <div>Actionable steps to resolve identified issues</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Implementation Phases -->
+        <div class="section">
+            <h2 class="section-title">Implementation Phases</h2>
+
+            <div class="key-deliverables">
+                <h3>Phase 1: Foundation (Week 1-2)</h3>
+                <ul>
+                    <li>Flask application setup with authentication</li>
+                    <li>Database connector implementation (Bookmarked staging/production)</li>
+                    <li>Customer integration settings framework</li>
+                    <li>Base diagnostic tool class</li>
+                    <li>Basic UI with dashboard</li>
+                </ul>
+            </div>
+
+            <div class="key-deliverables">
+                <h3>Phase 2: Core Tools (Week 3-4)</h3>
+                <ul>
+                    <li>Student Mismatch Resolver tool</li>
+                    <li>Missing Data Finder tool</li>
+                    <li>ClassLink API connector</li>
+                    <li>OneRoster API/CSV connector</li>
+                    <li>Tool UI and results display</li>
+                </ul>
+            </div>
+
+            <div class="key-deliverables">
+                <h3>Phase 3: Advanced Features (Week 5-6)</h3>
+                <ul>
+                    <li>Parent Email Conflict tool</li>
+                    <li>Campus Transfer Validator tool</li>
+                    <li>HubSpot integration (OAuth, ticket import)</li>
+                    <li>Automated tool recommendation engine</li>
+                    <li>FTP connector for customer data</li>
+                </ul>
+            </div>
+
+            <div class="key-deliverables">
+                <h3>Phase 4: Deployment & Refinement (Week 7-8)</h3>
+                <ul>
+                    <li>AWS deployment (Lambda or ECS Fargate)</li>
+                    <li>Credential migration to AWS Secrets Manager</li>
+                    <li>User acceptance testing with support team</li>
+                    <li>Documentation and training materials</li>
+                    <li>Performance optimization and monitoring</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Success Metrics -->
+        <div class="section">
+            <h2 class="section-title">Success Criteria</h2>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1.5rem;">
+                <div class="key-deliverables">
+                    <h3>Technical Metrics</h3>
+                    <ul>
+                        <li>All tools return results in &lt;30 seconds</li>
+                        <li>Database connection success rate &gt;99%</li>
+                        <li>Zero credential leaks or security incidents</li>
+                        <li>Support for all active customer integration types</li>
+                        <li>Tool accuracy &gt;95% (validated against known issues)</li>
+                    </ul>
+                </div>
+
+                <div class="key-deliverables">
+                    <h3>Business Metrics</h3>
+                    <ul>
+                        <li>Reduce avg ticket resolution time by 50%</li>
+                        <li>80% of common issues diagnosable without manual queries</li>
+                        <li>100% of customer integration configs documented</li>
+                        <li>Support team adoption &gt;90%</li>
+                        <li>User satisfaction rating &gt;4.0/5.0</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Security Section -->
+        <div class="section">
+            <h2 class="section-title">Security & Compliance</h2>
+
+            <div style="background: #fff5f5; border-left: 4px solid #ff6227; padding: 1.5rem; border-radius: 6px; margin-top: 1.5rem;">
+                <h4 style="color: #183162; margin-bottom: 1rem;">Security Features</h4>
+                <ul style="margin-left: 1.5rem; line-height: 1.8;">
+                    <li><strong>Read-Only Database Access:</strong> All connections are read-only to prevent data modification</li>
+                    <li><strong>Credential Encryption:</strong> All credentials stored in AWS Secrets Manager with encryption at rest</li>
+                    <li><strong>HTTPS Only:</strong> All communication encrypted in transit</li>
+                    <li><strong>Session Management:</strong> Automatic timeout after 60 minutes of inactivity</li>
+                    <li><strong>Audit Logging:</strong> All data access is logged for compliance</li>
+                    <li><strong>Role-Based Access:</strong> Separate permissions for staging vs. production access</li>
+                    <li><strong>2FA Option:</strong> Two-factor authentication for production environment access</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <h3 style="color: #183162; margin-bottom: 1rem;">Project Team</h3>
+            <p style="color: #666;">
+                <strong>Development:</strong> Engineering Team<br>
+                <strong>Stakeholders:</strong> Customer Support, Technical Support, Integration Specialists<br>
+                <strong>Target Users:</strong> Support Engineers, Technical Support Team
+            </p>
+            <p style="margin-top: 2rem; color: #666;">
+                <strong>Related Documents:</strong>
+                <a href="../PROJECT_REQUIREMENTS.md" style="color: #ff6227; text-decoration: none; font-weight: 600;">Full Requirements</a> |
+                <a href="ARCHITECTURE.md" style="color: #ff6227; text-decoration: none;">Architecture Details</a> |
+                <a href="DEPLOYMENT_GUIDE.md" style="color: #ff6227; text-decoration: none;">Deployment Guide</a> |
+                <a href="USER_GUIDE.md" style="color: #ff6227; text-decoration: none;">User Guide</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Executive Summary loaded');
+        });
+    </script>
+</body>
+</html>

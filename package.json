@@ -1,0 +1,24 @@
+{
+  "name": "customer-data-tools",
+  "version": "1.0.0",
+  "description": "Customer Data Tools - Diagnostic platform for Bookmarked customer support",
+  "main": "kanban_server.js",
+  "scripts": {
+    "start": "node kanban_server.js",
+    "kanban": "node kanban_server.js"
+  },
+  "keywords": [
+    "customer-support",
+    "diagnostics",
+    "kanban"
+  ],
+  "author": "Bookmarked",
+  "license": "PROPRIETARY",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.9.1",
+    "node-fetch": "^2.7.0"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
