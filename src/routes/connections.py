@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 from src.connectors.bookmarked_db import BookmarkedDBConnector
 from src.connectors.hubspot import HubSpotConnector
 from src.connectors.clickup import ClickUpConnector
+from src.connectors.classlink import ClassLinkConnector
 from src.utils.connections import ConnectionsConfig
 import structlog
 
@@ -86,6 +87,32 @@ def test_clickup():
     return jsonify(result)
 
 
+@connections_bp.route('/api/connections/test/classlink', methods=['POST'])
+def test_classlink():
+    """Test ClassLink API connection"""
+    data = request.json
+
+    connector = ClassLinkConnector()
+    result = connector.test_connection(
+        api_key=data.get('api_key')
+    )
+
+    return jsonify(result)
+
+
+@connections_bp.route('/api/connections/validate/classlink', methods=['POST'])
+def validate_classlink():
+    """Validate ClassLink data quality"""
+    data = request.json
+
+    connector = ClassLinkConnector()
+    result = connector.validate_data_quality(
+        api_key=data.get('api_key')
+    )
+
+    return jsonify(result)
+
+
 @connections_bp.route('/api/connections/save', methods=['POST'])
 def save_connections():
     """Save all connection configurations"""
@@ -129,6 +156,13 @@ def save_connections():
         connections['clickup'] = {
             'api_key': data['clickup'].get('api_key'),
             'enabled': data['clickup'].get('enabled', True)
+        }
+
+    # ClassLink
+    if data.get('classlink'):
+        connections['classlink'] = {
+            'api_key': data['classlink'].get('api_key'),
+            'enabled': data['classlink'].get('enabled', True)
         }
 
     success = config_manager.save_connections(connections)

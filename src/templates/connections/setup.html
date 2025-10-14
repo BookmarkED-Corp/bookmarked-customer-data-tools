@@ -325,6 +325,27 @@
 
                 <div class="status-message" id="clickup-message"></div>
             </div>
+
+            <!-- ClassLink API -->
+            <div class="connection-section" id="classlink-section">
+                <h2>
+                    <span class="status-indicator" id="classlink-status"></span>
+                    ClassLink API
+                </h2>
+
+                <div class="form-group">
+                    <label for="classlink-api-key">API Key</label>
+                    <input type="password" id="classlink-api-key" placeholder="Enter ClassLink API key">
+                    <div class="help-text">Get your API key from ClassLink Admin Portal → Integrations</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('classlink')">Test Connection</button>
+                    <button class="btn-test" onclick="validateClassLink()" id="classlink-validate-btn" style="display:none;">Validate Data Quality</button>
+                </div>
+
+                <div class="status-message" id="classlink-message"></div>
+            </div>
         </div>
     </div>
 
@@ -399,6 +420,10 @@
                 data = {
                     api_key: document.getElementById('clickup-api-key').value
                 };
+            } else if (type === 'classlink') {
+                data = {
+                    api_key: document.getElementById('classlink-api-key').value
+                };
             }
 
             try {
@@ -419,6 +444,11 @@
                         messageEl.textContent += ` - ${JSON.stringify(result.details)}`;
                     }
                     statusEl.className = 'status-indicator success';
+
+                    // Show validate button for ClassLink
+                    if (type === 'classlink') {
+                        document.getElementById('classlink-validate-btn').style.display = 'inline-block';
+                    }
                 } else {
                     messageEl.className = 'status-message error';
                     messageEl.textContent = `✗ ${result.message}`;
@@ -432,6 +462,62 @@
 
             button.disabled = false;
             button.textContent = 'Test Connection';
+        }
+
+        // Validate ClassLink data quality
+        async function validateClassLink() {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Validating...';
+
+            const messageEl = document.getElementById('classlink-message');
+
+            const data = {
+                api_key: document.getElementById('classlink-api-key').value
+            };
+
+            try {
+                const response = await fetch('/api/connections/validate/classlink', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    let message = '✓ Data validation passed\n';
+                    message += `\nStats: ${JSON.stringify(result.stats, null, 2)}`;
+
+                    if (result.warnings && result.warnings.length > 0) {
+                        message += `\n\nWarnings:\n${result.warnings.join('\n')}`;
+                    }
+
+                    messageEl.className = 'status-message success';
+                    messageEl.innerHTML = `<pre style="margin:0;">${message}</pre>`;
+                } else {
+                    let message = '✗ Data validation failed\n';
+
+                    if (result.errors && result.errors.length > 0) {
+                        message += `\nErrors:\n${result.errors.join('\n')}`;
+                    }
+
+                    if (result.warnings && result.warnings.length > 0) {
+                        message += `\n\nWarnings:\n${result.warnings.join('\n')}`;
+                    }
+
+                    messageEl.className = 'status-message error';
+                    messageEl.innerHTML = `<pre style="margin:0;">${message}</pre>`;
+                }
+            } catch (error) {
+                messageEl.className = 'status-message error';
+                messageEl.textContent = `✗ Error: ${error.message}`;
+            }
+
+            button.disabled = false;
+            button.textContent = 'Validate Data Quality';
         }
 
         // Save all connections
@@ -459,6 +545,10 @@
                 },
                 clickup: {
                     api_key: document.getElementById('clickup-api-key').value,
+                    enabled: true
+                },
+                classlink: {
+                    api_key: document.getElementById('classlink-api-key').value,
                     enabled: true
                 }
             };
@@ -528,6 +618,17 @@
                         }
                         if (conn.clickup.enabled) {
                             document.getElementById('clickup-status').className = 'status-indicator success';
+                        }
+                    }
+
+                    // Load ClassLink
+                    if (conn.classlink) {
+                        if (conn.classlink.api_key && conn.classlink.api_key !== '****') {
+                            document.getElementById('classlink-api-key').value = conn.classlink.api_key;
+                        }
+                        if (conn.classlink.enabled) {
+                            document.getElementById('classlink-status').className = 'status-indicator success';
+                            document.getElementById('classlink-validate-btn').style.display = 'inline-block';
                         }
                     }
                 }
