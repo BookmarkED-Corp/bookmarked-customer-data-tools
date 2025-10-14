@@ -293,13 +293,14 @@
                 </h2>
 
                 <div class="form-group">
-                    <label for="hubspot-token">Access Token</label>
-                    <input type="password" id="hubspot-token" placeholder="Enter HubSpot API access token">
-                    <div class="help-text">Get your token from HubSpot Settings → Integrations → API Key</div>
+                    <label>OAuth Connection</label>
+                    <input type="hidden" id="hubspot-token">
+                    <div class="help-text">Click the button below to connect your HubSpot account via OAuth</div>
                 </div>
 
                 <div class="button-group">
-                    <button class="btn-test" onclick="testConnection('hubspot')">Test Connection</button>
+                    <button class="btn-test" onclick="connectHubSpot()">🔗 Connect to HubSpot</button>
+                    <button class="btn-test" onclick="testConnection('hubspot')" id="hubspot-test-btn" style="display:none;">Test Connection</button>
                 </div>
 
                 <div class="status-message" id="hubspot-message"></div>
@@ -312,6 +313,45 @@
     </div>
 
     <script>
+        // HubSpot OAuth connection
+        function connectHubSpot() {
+            const width = 600;
+            const height = 700;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+
+            const popup = window.open(
+                '/auth/hubspot/start',
+                'HubSpot OAuth',
+                `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+            );
+
+            // Listen for OAuth success message from popup
+            window.addEventListener('message', function(event) {
+                if (event.origin !== window.location.origin) {
+                    return;
+                }
+
+                if (event.data.type === 'hubspot_auth_success') {
+                    const accessToken = event.data.access_token;
+                    const refreshToken = event.data.refresh_token;
+
+                    // Store token in hidden field
+                    document.getElementById('hubspot-token').value = accessToken;
+
+                    // Update UI
+                    const messageEl = document.getElementById('hubspot-message');
+                    const statusEl = document.getElementById('hubspot-status');
+                    messageEl.className = 'status-message success';
+                    messageEl.textContent = '✓ Successfully connected to HubSpot!';
+                    statusEl.className = 'status-indicator success';
+
+                    // Show test button
+                    document.getElementById('hubspot-test-btn').style.display = 'inline-block';
+                }
+            });
+        }
+
         // Test connection function
         async function testConnection(type) {
             const button = event.target;

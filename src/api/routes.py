@@ -13,8 +13,10 @@ def register_routes(app: Flask):
     """
     # Import and register blueprints
     from src.routes.connections import connections_bp
+    from src.routes.hubspot_auth import hubspot_auth_bp
 
     app.register_blueprint(connections_bp)
+    app.register_blueprint(hubspot_auth_bp)
 
     # Additional blueprints (to be implemented):
     # from src.routes.dashboard import dashboard_bp
