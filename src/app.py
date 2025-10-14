@@ -131,6 +131,7 @@ def create_app(config_name='development'):
 
                     <h4>Quick Links:</h4>
                     <ul>
+                        <li><a href="/connections/setup" style="color: #ff6227; font-weight: 600;">🔌 Connection Setup</a> - Configure database and API connections</li>
                         <li><a href="/docs/EXECUTIVE_SUMMARY.html" target="_blank">Executive Summary</a></li>
                         <li><a href="http://localhost:9001/kanban_ui.html" target="_blank">Kanban Board</a></li>
                     </ul>

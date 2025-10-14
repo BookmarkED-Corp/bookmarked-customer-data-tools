@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Connection Setup - Customer Data Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #183162;
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .content {
+            background: white;
+            padding: 40px;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .connection-section {
+            margin-bottom: 40px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+        }
+
+        .connection-section h2 {
+            color: #183162;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-indicator.success {
+            background: #15b79e;
+        }
+
+        .status-indicator.error {
+            background: #ff4444;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #ff6227;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-test {
+            background: #15b79e;
+            color: white;
+        }
+
+        .btn-test:hover {
+            background: #0f9582;
+        }
+
+        .btn-test:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-save {
+            background: #ff6227;
+            color: white;
+        }
+
+        .btn-save:hover {
+            background: #e5551f;
+        }
+
+        .status-message {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .grid-2col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .save-all {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+        }
+
+        .save-all button {
+            padding: 16px 32px;
+            font-size: 16px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 Connection Setup</h1>
+            <p>Configure and test connections to Bookmarked databases and HubSpot</p>
+        </div>
+
+        <div class="content">
+            <!-- Staging Database -->
+            <div class="connection-section" id="staging-section">
+                <h2>
+                    <span class="status-indicator" id="staging-status"></span>
+                    Bookmarked Staging Database
+                </h2>
+
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label for="staging-host">Host</label>
+                        <input type="text" id="staging-host" placeholder="staging-db.bookmarked.com">
+                        <div class="help-text">Database server hostname or IP</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="staging-port">Port</label>
+                        <input type="number" id="staging-port" value="5432">
+                        <div class="help-text">Usually 5432 for PostgreSQL</div>
+                    </div>
+                </div>
+
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label for="staging-database">Database Name</label>
+                        <input type="text" id="staging-database" placeholder="bookmarked_staging">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="staging-user">Username</label>
+                        <input type="text" id="staging-user" placeholder="readonly_user">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="staging-password">Password</label>
+                    <input type="password" id="staging-password" placeholder="Enter database password">
+                    <div class="help-text">Password is encrypted when saved</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('staging')">Test Connection</button>
+                </div>
+
+                <div class="status-message" id="staging-message"></div>
+            </div>
+
+            <!-- Production Database -->
+            <div class="connection-section" id="production-section">
+                <h2>
+                    <span class="status-indicator" id="production-status"></span>
+                    Bookmarked Production Database
+                </h2>
+
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label for="production-host">Host</label>
+                        <input type="text" id="production-host" placeholder="production-db.bookmarked.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="production-port">Port</label>
+                        <input type="number" id="production-port" value="5432">
+                    </div>
+                </div>
+
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label for="production-database">Database Name</label>
+                        <input type="text" id="production-database" placeholder="bookmarked_production">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="production-user">Username</label>
+                        <input type="text" id="production-user" placeholder="readonly_user">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="production-password">Password</label>
+                    <input type="password" id="production-password" placeholder="Enter database password">
+                    <div class="help-text">Password is encrypted when saved</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('production')">Test Connection</button>
+                </div>
+
+                <div class="status-message" id="production-message"></div>
+            </div>
+
+            <!-- HubSpot API -->
+            <div class="connection-section" id="hubspot-section">
+                <h2>
+                    <span class="status-indicator" id="hubspot-status"></span>
+                    HubSpot API
+                </h2>
+
+                <div class="form-group">
+                    <label for="hubspot-token">Access Token</label>
+                    <input type="password" id="hubspot-token" placeholder="Enter HubSpot API access token">
+                    <div class="help-text">Get your token from HubSpot Settings → Integrations → API Key</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('hubspot')">Test Connection</button>
+                </div>
+
+                <div class="status-message" id="hubspot-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="save-all">
+        <button class="btn-save" onclick="saveAllConnections()">💾 Save All Connections</button>
+    </div>
+
+    <script>
+        // Test connection function
+        async function testConnection(type) {
+            const button = event.target;
+            button.disabled = true;
+            button.textContent = 'Testing...';
+
+            const messageEl = document.getElementById(`${type}-message`);
+            const statusEl = document.getElementById(`${type}-status`);
+
+            let data = {};
+
+            if (type === 'staging' || type === 'production') {
+                data = {
+                    host: document.getElementById(`${type}-host`).value,
+                    port: document.getElementById(`${type}-port`).value,
+                    database: document.getElementById(`${type}-database`).value,
+                    user: document.getElementById(`${type}-user`).value,
+                    password: document.getElementById(`${type}-password`).value
+                };
+            } else if (type === 'hubspot') {
+                data = {
+                    access_token: document.getElementById('hubspot-token').value
+                };
+            }
+
+            try {
+                const response = await fetch(`/api/connections/test/${type}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    messageEl.className = 'status-message success';
+                    messageEl.textContent = `✓ ${result.message}`;
+                    if (result.details) {
+                        messageEl.textContent += ` - ${JSON.stringify(result.details)}`;
+                    }
+                    statusEl.className = 'status-indicator success';
+                } else {
+                    messageEl.className = 'status-message error';
+                    messageEl.textContent = `✗ ${result.message}`;
+                    statusEl.className = 'status-indicator error';
+                }
+            } catch (error) {
+                messageEl.className = 'status-message error';
+                messageEl.textContent = `✗ Error: ${error.message}`;
+                statusEl.className = 'status-indicator error';
+            }
+
+            button.disabled = false;
+            button.textContent = 'Test Connection';
+        }
+
+        // Save all connections
+        async function saveAllConnections() {
+            const data = {
+                staging: {
+                    host: document.getElementById('staging-host').value,
+                    port: document.getElementById('staging-port').value,
+                    database: document.getElementById('staging-database').value,
+                    user: document.getElementById('staging-user').value,
+                    password: document.getElementById('staging-password').value,
+                    enabled: true
+                },
+                production: {
+                    host: document.getElementById('production-host').value,
+                    port: document.getElementById('production-port').value,
+                    database: document.getElementById('production-database').value,
+                    user: document.getElementById('production-user').value,
+                    password: document.getElementById('production-password').value,
+                    enabled: true
+                },
+                hubspot: {
+                    access_token: document.getElementById('hubspot-token').value,
+                    enabled: true
+                }
+            };
+
+            try {
+                const response = await fetch('/api/connections/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✓ All connections saved successfully!');
+                    window.location.href = '/';
+                } else {
+                    alert('✗ Failed to save connections: ' + result.message);
+                }
+            } catch (error) {
+                alert('✗ Error saving connections: ' + error.message);
+            }
+        }
+
+        // Load existing connections on page load
+        window.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/connections/load');
+                const result = await response.json();
+
+                if (result.success && result.connections) {
+                    const conn = result.connections;
+
+                    // Load staging
+                    if (conn.staging) {
+                        document.getElementById('staging-host').value = conn.staging.host || '';
+                        document.getElementById('staging-port').value = conn.staging.port || 5432;
+                        document.getElementById('staging-database').value = conn.staging.database || '';
+                        document.getElementById('staging-user').value = conn.staging.user || '';
+                        if (conn.staging.enabled) {
+                            document.getElementById('staging-status').className = 'status-indicator success';
+                        }
+                    }
+
+                    // Load production
+                    if (conn.production) {
+                        document.getElementById('production-host').value = conn.production.host || '';
+                        document.getElementById('production-port').value = conn.production.port || 5432;
+                        document.getElementById('production-database').value = conn.production.database || '';
+                        document.getElementById('production-user').value = conn.production.user || '';
+                        if (conn.production.enabled) {
+                            document.getElementById('production-status').className = 'status-indicator success';
+                        }
+                    }
+
+                    // Load HubSpot
+                    if (conn.hubspot && conn.hubspot.enabled) {
+                        document.getElementById('hubspot-status').className = 'status-indicator success';
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading connections:', error);
+            }
+        });
+    </script>
+</body>
+</html>
