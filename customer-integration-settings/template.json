@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Template for customer integration settings. Copy this file and customize for each customer.",
+
+  "customer_id": "example-district-id",
+  "customer_name": "Example District",
+  "district_name": "Example ISD",
+  "integration_type": "ClassLink",
+
+  "classlink": {
+    "enabled": true,
+    "tenant_id": "example_tenant",
+    "api_version": "v2",
+    "notes": "ClassLink credentials stored in .env as CLASSLINK_API_KEY"
+  },
+
+  "oneroster": {
+    "enabled": false,
+    "api_url": "https://oneroster.example.com/ims/oneroster/v1p1",
+    "version": "1.2",
+    "client_id_ref": "ONEROSTER_CLIENT_ID_EXAMPLE",
+    "client_secret_ref": "ONEROSTER_CLIENT_SECRET_EXAMPLE",
+    "csv_upload_enabled": true,
+    "notes": "OneRoster credentials referenced from .env"
+  },
+
+  "ftp": {
+    "enabled": false,
+    "host": "ftp.example.com",
+    "port": 21,
+    "username_ref": "FTP_USERNAME_EXAMPLE",
+    "password_ref": "FTP_PASSWORD_EXAMPLE",
+    "remote_path": "/exports/student_data",
+    "file_pattern": "*.csv",
+    "notes": "FTP credentials referenced from .env"
+  },
+
+  "oneshelf_environment": "staging",
+  "bookmarked_org_id": "12345",
+
+  "sync_schedule": {
+    "enabled": false,
+    "frequency": "daily",
+    "time": "02:00"
+  },
+
+  "contact_info": {
+    "technical_contact": "tech@example.com",
+    "support_contact": "support@example.com"
+  },
+
+  "active": true,
+  "created_date": "2025-10-14",
+  "last_modified": "2025-10-14",
+  "notes": "Additional notes about this customer's integration"
+}
