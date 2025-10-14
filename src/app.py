@@ -4,23 +4,32 @@ Customer Data Tools - Flask Application
 Main application entry point for the diagnostic tools platform.
 """
 import os
-from flask import Flask, render_template, redirect, url_for
-from flask_login import LoginManager, login_required
+from flask import Flask
+from flask_cors import CORS
+from flask_login import LoginManager
+from dotenv import load_dotenv
+
+from src.config.config import Config
+from src.api.routes import register_routes
+from src.utils.logger import setup_logging, get_logger
+
+# Load environment variables
+load_dotenv()
+
+# Configure logging
+setup_logging()
+logger = get_logger(__name__)
 
 
-def create_app(config=None):
+def create_app(config_name='development'):
     """Application factory pattern for Flask app creation"""
     app = Flask(__name__)
 
     # Load configuration
-    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
-    app.config['DEBUG'] = os.getenv('DEBUG', 'True').lower() == 'true'
-    app.config['APP_NAME'] = os.getenv('APP_NAME', 'Customer Data Tools')
-    app.config['SESSION_TIMEOUT_MINUTES'] = int(os.getenv('SESSION_TIMEOUT_MINUTES', '60'))
+    app.config.from_object(Config)
 
-    # Override with custom config if provided
-    if config:
-        app.config.update(config)
+    # Enable CORS
+    CORS(app)
 
     # Initialize Flask-Login
     login_manager = LoginManager()
@@ -34,17 +43,10 @@ def create_app(config=None):
         # For now, return None (will be implemented in TASK-002)
         return None
 
-    # Register blueprints (will be implemented in future tasks)
-    # from src.routes.dashboard import dashboard_bp
-    # from src.routes.tools import tools_bp
-    # from src.routes.settings import settings_bp
-    # from src.routes.auth import auth_bp
-    # app.register_blueprint(auth_bp, url_prefix='/auth')
-    # app.register_blueprint(dashboard_bp, url_prefix='/')
-    # app.register_blueprint(tools_bp, url_prefix='/tools')
-    # app.register_blueprint(settings_bp, url_prefix='/settings')
+    # Register API routes and blueprints
+    register_routes(app)
 
-    # Temporary root route for initial setup
+    # Root endpoint
     @app.route('/')
     def index():
         return f"""
@@ -149,22 +151,31 @@ def create_app(config=None):
     def health():
         return {
             'status': 'healthy',
+            'service': 'customer-data-tools',
             'app_name': app.config['APP_NAME'],
             'environment': os.getenv('FLASK_ENV', 'development'),
-            'debug': app.config['DEBUG']
+            'version': '1.0.0',
+            'configured_services': {
+                'staging_db': Config.is_configured('staging_db'),
+                'production_db': Config.is_configured('production_db'),
+                'classlink': Config.is_configured('classlink'),
+                'hubspot': Config.is_configured('hubspot')
+            }
         }
+
+    logger.info("Application initialized", config=config_name)
 
     return app
 
 
 # Development server entry point
 if __name__ == '__main__':
+    app = create_app()
+
+    host = os.getenv('HOST', '0.0.0.0')
     port = int(os.getenv('PORT', '6000'))
     debug = os.getenv('DEBUG', 'True').lower() == 'true'
 
-    app = create_app()
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=debug
-    )
+    logger.info("Starting Customer Data Tools", host=host, port=port, debug=debug)
+
+    app.run(host=host, port=port, debug=debug)

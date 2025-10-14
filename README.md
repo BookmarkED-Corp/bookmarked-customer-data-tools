@@ -55,8 +55,11 @@ A Flask-based web application that provides centralized tools for diagnosing cus
 
 6. **Run the application**
    ```bash
-   flask run
+   python src/app.py
+   # Or: export FLASK_APP=src/app.py && flask run --port 6000
    ```
+
+   Access at: http://localhost:6000
 
 7. **Access the application**
    ```
