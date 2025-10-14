@@ -305,6 +305,26 @@
 
                 <div class="status-message" id="hubspot-message"></div>
             </div>
+
+            <!-- ClickUp API -->
+            <div class="connection-section" id="clickup-section">
+                <h2>
+                    <span class="status-indicator" id="clickup-status"></span>
+                    ClickUp API
+                </h2>
+
+                <div class="form-group">
+                    <label for="clickup-api-key">API Key</label>
+                    <input type="password" id="clickup-api-key" placeholder="Enter ClickUp API key">
+                    <div class="help-text">Get your API key from ClickUp Settings → Apps → API Token</div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('clickup')">Test Connection</button>
+                </div>
+
+                <div class="status-message" id="clickup-message"></div>
+            </div>
         </div>
     </div>
 
@@ -375,6 +395,10 @@
                 data = {
                     access_token: document.getElementById('hubspot-token').value
                 };
+            } else if (type === 'clickup') {
+                data = {
+                    api_key: document.getElementById('clickup-api-key').value
+                };
             }
 
             try {
@@ -431,6 +455,10 @@
                 },
                 hubspot: {
                     access_token: document.getElementById('hubspot-token').value,
+                    enabled: true
+                },
+                clickup: {
+                    api_key: document.getElementById('clickup-api-key').value,
                     enabled: true
                 }
             };
@@ -491,6 +519,16 @@
                     // Load HubSpot
                     if (conn.hubspot && conn.hubspot.enabled) {
                         document.getElementById('hubspot-status').className = 'status-indicator success';
+                    }
+
+                    // Load ClickUp
+                    if (conn.clickup) {
+                        if (conn.clickup.api_key && conn.clickup.api_key !== '****') {
+                            document.getElementById('clickup-api-key').value = conn.clickup.api_key;
+                        }
+                        if (conn.clickup.enabled) {
+                            document.getElementById('clickup-status').className = 'status-indicator success';
+                        }
                     }
                 }
             } catch (error) {

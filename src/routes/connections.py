@@ -6,6 +6,7 @@ Routes for testing and saving database and API connections.
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from src.connectors.bookmarked_db import BookmarkedDBConnector
 from src.connectors.hubspot import HubSpotConnector
+from src.connectors.clickup import ClickUpConnector
 from src.utils.connections import ConnectionsConfig
 import structlog
 
@@ -72,6 +73,19 @@ def test_hubspot():
     return jsonify(result)
 
 
+@connections_bp.route('/api/connections/test/clickup', methods=['POST'])
+def test_clickup():
+    """Test ClickUp API connection"""
+    data = request.json
+
+    connector = ClickUpConnector()
+    result = connector.test_connection(
+        api_key=data.get('api_key')
+    )
+
+    return jsonify(result)
+
+
 @connections_bp.route('/api/connections/save', methods=['POST'])
 def save_connections():
     """Save all connection configurations"""
@@ -110,6 +124,13 @@ def save_connections():
             'enabled': data['hubspot'].get('enabled', True)
         }
 
+    # ClickUp
+    if data.get('clickup'):
+        connections['clickup'] = {
+            'api_key': data['clickup'].get('api_key'),
+            'enabled': data['clickup'].get('enabled', True)
+        }
+
     success = config_manager.save_connections(connections)
 
     if success:
@@ -141,6 +162,8 @@ def load_connections():
                 safe_config['password'] = '****' if safe_config['password'] else ''
             if 'access_token' in safe_config:
                 safe_config['access_token'] = '****' if safe_config['access_token'] else ''
+            if 'api_key' in safe_config:
+                safe_config['api_key'] = '****' if safe_config['api_key'] else ''
             safe_connections[key] = safe_config
 
         return jsonify({
