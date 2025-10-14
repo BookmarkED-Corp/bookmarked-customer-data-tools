@@ -1,0 +1,7 @@
+# Minimal requirements to get Flask app running
+Flask==3.0.0
+Flask-CORS==4.0.0
+Flask-Login==0.6.3
+python-dotenv==1.0.0
+structlog==23.2.0
+requests==2.31.0
