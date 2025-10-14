@@ -1,0 +1,25 @@
+{
+  "staging": {
+    "host": "",
+    "port": 5432,
+    "database": "",
+    "user": "",
+    "password": ""
+  },
+  "production": {
+    "host": "",
+    "port": 5432,
+    "database": "",
+    "user": "",
+    "password": ""
+  },
+  "hubspot": {
+    "access_token": ""
+  },
+  "clickup": {
+    "api_key": ""
+  },
+  "classlink": {
+    "api_key": ""
+  }
+}

@@ -578,40 +578,95 @@
         // Load existing connections on page load
         window.addEventListener('DOMContentLoaded', async () => {
             try {
+                // First, load defaults from machine-specific config
+                const defaultsResponse = await fetch('/api/connections/defaults');
+                const defaultsResult = await defaultsResponse.json();
+
+                if (defaultsResult.success && defaultsResult.defaults) {
+                    const defaults = defaultsResult.defaults;
+
+                    // Load staging defaults
+                    if (defaults.staging) {
+                        document.getElementById('staging-host').value = defaults.staging.host || '';
+                        document.getElementById('staging-port').value = defaults.staging.port || 5432;
+                        document.getElementById('staging-database').value = defaults.staging.database || '';
+                        document.getElementById('staging-user').value = defaults.staging.user || '';
+                        document.getElementById('staging-password').value = defaults.staging.password || '';
+                    }
+
+                    // Load production defaults
+                    if (defaults.production) {
+                        document.getElementById('production-host').value = defaults.production.host || '';
+                        document.getElementById('production-port').value = defaults.production.port || 5432;
+                        document.getElementById('production-database').value = defaults.production.database || '';
+                        document.getElementById('production-user').value = defaults.production.user || '';
+                        document.getElementById('production-password').value = defaults.production.password || '';
+                    }
+
+                    // Load HubSpot defaults
+                    if (defaults.hubspot && defaults.hubspot.access_token) {
+                        document.getElementById('hubspot-token').value = defaults.hubspot.access_token;
+                    }
+
+                    // Load ClickUp defaults
+                    if (defaults.clickup && defaults.clickup.api_key) {
+                        document.getElementById('clickup-api-key').value = defaults.clickup.api_key;
+                    }
+
+                    // Load ClassLink defaults
+                    if (defaults.classlink && defaults.classlink.api_key) {
+                        document.getElementById('classlink-api-key').value = defaults.classlink.api_key;
+                    }
+                }
+
+                // Then, load saved connections (which override defaults)
                 const response = await fetch('/api/connections/load');
                 const result = await response.json();
 
                 if (result.success && result.connections) {
                     const conn = result.connections;
 
-                    // Load staging
+                    // Load staging (override defaults)
                     if (conn.staging) {
                         document.getElementById('staging-host').value = conn.staging.host || '';
                         document.getElementById('staging-port').value = conn.staging.port || 5432;
                         document.getElementById('staging-database').value = conn.staging.database || '';
                         document.getElementById('staging-user').value = conn.staging.user || '';
+                        // Don't override password if it's masked
+                        if (conn.staging.password && conn.staging.password !== '****') {
+                            document.getElementById('staging-password').value = conn.staging.password;
+                        }
                         if (conn.staging.enabled) {
                             document.getElementById('staging-status').className = 'status-indicator success';
                         }
                     }
 
-                    // Load production
+                    // Load production (override defaults)
                     if (conn.production) {
                         document.getElementById('production-host').value = conn.production.host || '';
                         document.getElementById('production-port').value = conn.production.port || 5432;
                         document.getElementById('production-database').value = conn.production.database || '';
                         document.getElementById('production-user').value = conn.production.user || '';
+                        // Don't override password if it's masked
+                        if (conn.production.password && conn.production.password !== '****') {
+                            document.getElementById('production-password').value = conn.production.password;
+                        }
                         if (conn.production.enabled) {
                             document.getElementById('production-status').className = 'status-indicator success';
                         }
                     }
 
-                    // Load HubSpot
-                    if (conn.hubspot && conn.hubspot.enabled) {
-                        document.getElementById('hubspot-status').className = 'status-indicator success';
+                    // Load HubSpot (override defaults)
+                    if (conn.hubspot) {
+                        if (conn.hubspot.access_token && conn.hubspot.access_token !== '****') {
+                            document.getElementById('hubspot-token').value = conn.hubspot.access_token;
+                        }
+                        if (conn.hubspot.enabled) {
+                            document.getElementById('hubspot-status').className = 'status-indicator success';
+                        }
                     }
 
-                    // Load ClickUp
+                    // Load ClickUp (override defaults)
                     if (conn.clickup) {
                         if (conn.clickup.api_key && conn.clickup.api_key !== '****') {
                             document.getElementById('clickup-api-key').value = conn.clickup.api_key;
@@ -621,7 +676,7 @@
                         }
                     }
 
-                    // Load ClassLink
+                    // Load ClassLink (override defaults)
                     if (conn.classlink) {
                         if (conn.classlink.api_key && conn.classlink.api_key !== '****') {
                             document.getElementById('classlink-api-key').value = conn.classlink.api_key;

@@ -27,6 +27,7 @@ class ConnectionsConfig:
         self.config_dir.mkdir(parents=True, exist_ok=True)
         self.config_file = self.config_dir / 'connections.config'
         self.key_file = self.config_dir / '.connection_key'
+        self.defaults_file = self.config_dir / 'defaults.json'
 
         # Load or generate encryption key
         self._encryption_key = self._load_or_generate_key()
@@ -76,8 +77,8 @@ class ConnectionsConfig:
             for key, config in connections.items():
                 encrypted_config = {}
                 for field, value in config.items():
-                    # Encrypt passwords and tokens
-                    if 'password' in field.lower() or 'token' in field.lower():
+                    # Encrypt passwords, tokens, and api keys
+                    if 'password' in field.lower() or 'token' in field.lower() or 'api_key' in field.lower():
                         encrypted_config[field] = self._encrypt(str(value))
                         encrypted_config[f'{field}_encrypted'] = True
                     else:
@@ -173,3 +174,28 @@ class ConnectionsConfig:
         if connections:
             return connections.get(connection_type)
         return None
+
+    def load_defaults(self) -> Optional[Dict[str, Any]]:
+        """
+        Load default connection values from defaults.json
+
+        Returns:
+            Dictionary of default connection configs or None if not found
+        """
+        if not self.defaults_file.exists():
+            logger.info("No defaults file found",
+                       defaults_file=str(self.defaults_file))
+            return None
+
+        try:
+            with open(self.defaults_file, 'r') as f:
+                defaults = json.load(f)
+
+            logger.info("Defaults loaded",
+                       num_defaults=len(defaults))
+            return defaults
+
+        except Exception as e:
+            logger.error("Failed to load defaults",
+                        error=str(e))
+            return None

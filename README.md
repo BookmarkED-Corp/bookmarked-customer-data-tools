@@ -48,22 +48,30 @@ A Flask-based web application that provides centralized tools for diagnosing cus
    # Edit .env with your credentials
    ```
 
-5. **Initialize database connections**
+5. **Set up machine-specific connection defaults (optional but recommended)**
+   ```bash
+   cd config
+   cp defaults.json.template defaults.json
+   # Edit defaults.json with your connection defaults
+   cd ..
+   ```
+
+   This step is optional but highly recommended. It allows you to save your default connection values (database credentials, API keys) that will automatically pre-fill the connection setup page. Each developer can have their own defaults without conflicts. See [CONFIGURATION.md](CONFIGURATION.md) for details.
+
+6. **Initialize database connections**
    ```bash
    python scripts/test_connections.py
    ```
 
-6. **Run the application**
+7. **Run the application**
    ```bash
    python src/app.py
    # Or: export FLASK_APP=src/app.py && flask run --port 6000
    ```
 
-   Access at: http://localhost:6000
-
-7. **Access the application**
+8. **Access the application**
    ```
-   http://localhost:5000
+   http://localhost:6001
    ```
 
 ## Project Structure
@@ -92,6 +100,7 @@ customer-data-tools/
 ## Documentation
 
 - **[Project Requirements](PROJECT_REQUIREMENTS.md)** - Complete requirements specification
+- **[Configuration Guide](CONFIGURATION.md)** - Machine-specific connection defaults
 - **[Executive Summary](docs/EXECUTIVE_SUMMARY.html)** - Visual project overview
 - **[Architecture](docs/ARCHITECTURE.md)** - System architecture and design decisions
 - **[User Guide](docs/USER_GUIDE.md)** - How to use the diagnostic tools
@@ -152,6 +161,24 @@ open http://localhost:9001/kanban_ui.html
 ```
 
 ## Configuration
+
+### Machine-Specific Connection Defaults
+
+**NEW**: The application supports machine-specific connection defaults that automatically pre-fill the connection setup page.
+
+```bash
+cd config
+cp defaults.json.template defaults.json
+# Edit defaults.json with your credentials
+```
+
+Benefits:
+- Each developer can have different defaults
+- Credentials stay local (gitignored)
+- Auto-fills forms on setup page
+- Saves time and reduces errors
+
+See **[CONFIGURATION.md](CONFIGURATION.md)** for complete documentation.
 
 ### Environment Variables
 

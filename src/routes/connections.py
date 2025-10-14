@@ -209,3 +209,22 @@ def load_connections():
             'success': False,
             'message': 'No saved connections found'
         })
+
+
+@connections_bp.route('/api/connections/defaults', methods=['GET'])
+def load_defaults():
+    """Load default connection configurations from machine-specific config"""
+    config_manager = ConnectionsConfig()
+    defaults = config_manager.load_defaults()
+
+    if defaults:
+        # Return defaults as-is (they will be used to pre-fill forms)
+        return jsonify({
+            'success': True,
+            'defaults': defaults
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': 'No defaults file found'
+        })

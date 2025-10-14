@@ -61,6 +61,11 @@ htmlcov/
 customer-integration-settings/*.json
 !customer-integration-settings/template.json
 
+# Machine-specific connection defaults
+config/defaults.json
+config/.connection_key
+config/connections.config
+
 # Temporary files
 tmp/
 temp/
