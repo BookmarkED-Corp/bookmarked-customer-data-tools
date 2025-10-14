@@ -173,7 +173,7 @@ if __name__ == '__main__':
     app = create_app()
 
     host = os.getenv('HOST', '0.0.0.0')
-    port = int(os.getenv('PORT', '6000'))
+    port = int(os.getenv('PORT', '6001'))
     debug = os.getenv('DEBUG', 'True').lower() == 'true'
 
     logger.info("Starting Customer Data Tools", host=host, port=port, debug=debug)

@@ -54,7 +54,7 @@ class Config:
     HUBSPOT_API_URL = os.getenv('HUBSPOT_API_URL', 'https://api.hubapi.com')
     HUBSPOT_CLIENT_ID = os.getenv('HUBSPOT_CLIENT_ID')
     HUBSPOT_CLIENT_SECRET = os.getenv('HUBSPOT_CLIENT_SECRET')
-    HUBSPOT_REDIRECT_URI = os.getenv('HUBSPOT_REDIRECT_URI', 'http://localhost:6000/auth/hubspot/callback')
+    HUBSPOT_REDIRECT_URI = os.getenv('HUBSPOT_REDIRECT_URI', 'http://localhost:6001/auth/hubspot/callback')
 
     # AWS Configuration
     AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')

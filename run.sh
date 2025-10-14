@@ -15,7 +15,7 @@ if [ -f ".env" ]; then
 fi
 
 # Set defaults
-export PORT=${PORT:-6000}
+export PORT=${PORT:-6001}
 export DEBUG=${DEBUG:-True}
 export FLASK_ENV=${FLASK_ENV:-development}
 
