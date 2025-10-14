@@ -4,6 +4,8 @@
 
 A Flask-based web application that provides centralized tools for diagnosing customer integration issues, accessing source data from SIS systems, and comparing against Bookmarked production data.
 
+**Target Launch:** October 31, 2025 (17 days)
+
 ## Features
 
 - **Multi-Environment Support**: Access both staging and production environments
