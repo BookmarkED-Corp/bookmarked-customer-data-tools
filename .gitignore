@@ -66,7 +66,19 @@ config/defaults.json
 config/.connection_key
 config/connections.config
 
+# Secrets file (contains credentials)
+secrets.yml
+
 # Temporary files
 tmp/
 temp/
 *.tmp
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Playwright test results
+test-results/
+playwright-report/
+tests/browser/playwright-report/
