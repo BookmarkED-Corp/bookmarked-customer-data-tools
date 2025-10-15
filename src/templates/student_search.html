@@ -631,9 +631,9 @@
                 `;
 
                 data.parents.forEach(parent => {
-                    const parentName = `${parent.firstName || ''} ${parent.lastName || ''}`.trim() || 'Unknown';
+                    const parentName = `${parent.givenName || ''} ${parent.familyName || ''}`.trim() || 'Unknown';
                     const email = parent.email || 'No email';
-                    const phone = parent.phoneNumber || 'No phone';
+                    const phone = parent.phone || 'No phone';
                     html += `
                         <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
                             <span class="field-label">${parentName}</span>

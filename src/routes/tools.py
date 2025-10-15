@@ -318,13 +318,13 @@ def search_student():
                 SELECT
                     p.id,
                     p.email,
-                    p."firstName",
-                    p."lastName",
-                    p."phoneNumber"
+                    p."givenName",
+                    p."familyName",
+                    p.phone
                 FROM "_ParentToStudent" ps
                 JOIN "Parent" p ON ps."A" = p.id
                 WHERE ps."B" = :student_id
-                ORDER BY p."lastName", p."firstName"
+                ORDER BY p."familyName", p."givenName"
             """
             parents = db.execute_query(parents_query, {
                 'student_id': bookmarked_data['id']
