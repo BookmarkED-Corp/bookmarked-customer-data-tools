@@ -262,8 +262,9 @@ def search_student():
             }), 500
 
         # Query student from Bookmarked DB
+        # First find the student
         student_query = """
-            SELECT
+            SELECT DISTINCT
                 s.id,
                 s."sourcedId",
                 s."givenName",
@@ -272,9 +273,7 @@ def search_student():
                 s.grade,
                 s."isDeleted",
                 s."createdAt",
-                s."updatedAt",
-                c.name as campus,
-                c.id as campus_id
+                s."updatedAt"
             FROM "Student" s
             LEFT JOIN "_CampusToStudent" cs ON s.id = cs."B"
             LEFT JOIN "Campus" c ON cs."A" = c.id
@@ -295,6 +294,65 @@ def search_student():
         })
 
         bookmarked_data = bookmarked_results[0] if bookmarked_results else None
+
+        # Get all campuses for this student
+        if bookmarked_data:
+            campus_query = """
+                SELECT
+                    c.id,
+                    c.name,
+                    c."districtId"
+                FROM "_CampusToStudent" cs
+                JOIN "Campus" c ON cs."A" = c.id
+                WHERE cs."B" = :student_id
+                ORDER BY c.name
+            """
+            campuses = db.execute_query(campus_query, {
+                'student_id': bookmarked_data['id']
+            })
+            bookmarked_data['campuses'] = campuses
+            logger.info("Campuses retrieved for student", count=len(campuses))
+
+            # Get parents for this student
+            parents_query = """
+                SELECT
+                    p.id,
+                    p.email,
+                    p."firstName",
+                    p."lastName",
+                    p."phoneNumber"
+                FROM "_ParentToStudent" ps
+                JOIN "Parent" p ON ps."A" = p.id
+                WHERE ps."B" = :student_id
+                ORDER BY p."lastName", p."firstName"
+            """
+            parents = db.execute_query(parents_query, {
+                'student_id': bookmarked_data['id']
+            })
+            bookmarked_data['parents'] = parents
+            logger.info("Parents retrieved for student", count=len(parents))
+
+            # Get siblings (students who share the same parents)
+            siblings_query = """
+                SELECT DISTINCT
+                    s.id,
+                    s."sourcedId",
+                    s."givenName",
+                    s."familyName",
+                    s.grade
+                FROM "Student" s
+                JOIN "_ParentToStudent" ps ON s.id = ps."B"
+                WHERE ps."A" IN (
+                    SELECT "A" FROM "_ParentToStudent" WHERE "B" = :student_id
+                )
+                AND s.id != :student_id
+                ORDER BY s.grade DESC, s."familyName", s."givenName"
+            """
+            siblings = db.execute_query(siblings_query, {
+                'student_id': bookmarked_data['id']
+            })
+            bookmarked_data['siblings'] = siblings
+            logger.info("Siblings retrieved for student", count=len(siblings))
 
         # Get enrollment data if student found
         enrollments = []
@@ -344,7 +402,7 @@ def search_student():
                         cd.name,
                         cd."lastSync",
                         cd."districtId",
-                        ca."onerosterApplicationId"
+                        ca.oneroster_application_id
                     FROM "ClasslinkDistrict" cd
                     LEFT JOIN "ClasslinkApplication" ca ON cd."classlinkApplicationId" = ca.id
                     WHERE cd."districtId" = :district_id
@@ -367,7 +425,7 @@ def search_student():
                     db_cl.disconnect()
 
                     if classlink_district and len(classlink_district) > 0:
-                        oneroster_app_id = classlink_district[0].get('onerosterApplicationId')
+                        oneroster_app_id = classlink_district[0].get('oneroster_application_id')
 
                         if oneroster_app_id:
                             # Initialize ClassLink connector

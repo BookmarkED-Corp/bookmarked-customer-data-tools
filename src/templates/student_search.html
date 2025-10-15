@@ -541,7 +541,6 @@
                 { key: 'familyName', label: 'Last Name' },
                 { key: 'email', label: 'Email' },
                 { key: 'grade', label: 'Grade' },
-                { key: 'campus', label: 'Campus' },
                 { key: 'isDeleted', label: 'Is Deleted' },
                 { key: 'createdAt', label: 'Created' },
                 { key: 'updatedAt', label: 'Updated' }
@@ -577,6 +576,98 @@
                     </div>
                 `;
             });
+
+            // Display campuses if available
+            if (data.campuses && data.campuses.length > 0) {
+                html += `
+                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
+                        <span class="field-label" style="font-size: 16px; color: #183162;">📍 Campuses (${data.campuses.length}):</span>
+                        <span class="field-value"></span>
+                    </div>
+                `;
+
+                data.campuses.forEach(campus => {
+                    html += `
+                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                            <span class="field-label">${campus.name}</span>
+                            <span class="field-value" style="font-size: 12px; color: #666;">
+                                Campus ID: ${campus.id}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            // Display enrollments if available
+            if (data.enrollments && data.enrollments.length > 0) {
+                html += `
+                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
+                        <span class="field-label" style="font-size: 16px; color: #183162;">📚 Enrollments (${data.enrollments.length}):</span>
+                        <span class="field-value"></span>
+                    </div>
+                `;
+
+                data.enrollments.forEach(enrollment => {
+                    const status = enrollment.status || 'active';
+                    const statusColor = status === 'active' ? '#15b79e' : '#999';
+                    html += `
+                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                            <span class="field-label">${enrollment.sourcedId || 'Class'}</span>
+                            <span class="field-value" style="font-size: 12px; color: ${statusColor};">
+                                ${enrollment.role || 'student'} | ${status}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            // Display parents if available
+            if (data.parents && data.parents.length > 0) {
+                html += `
+                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
+                        <span class="field-label" style="font-size: 16px; color: #183162;">👨‍👩‍👧‍👦 Parents (${data.parents.length}):</span>
+                        <span class="field-value"></span>
+                    </div>
+                `;
+
+                data.parents.forEach(parent => {
+                    const parentName = `${parent.firstName || ''} ${parent.lastName || ''}`.trim() || 'Unknown';
+                    const email = parent.email || 'No email';
+                    const phone = parent.phoneNumber || 'No phone';
+                    html += `
+                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                            <span class="field-label">${parentName}</span>
+                            <span class="field-value" style="font-size: 12px; color: #666;">
+                                ${email}<br>${phone}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            // Display siblings if available
+            if (data.siblings && data.siblings.length > 0) {
+                html += `
+                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
+                        <span class="field-label" style="font-size: 16px; color: #183162;">👫 Siblings (${data.siblings.length}):</span>
+                        <span class="field-value"></span>
+                    </div>
+                `;
+
+                data.siblings.forEach(sibling => {
+                    const siblingName = `${sibling.givenName || ''} ${sibling.familyName || ''}`.trim() || 'Unknown';
+                    const grade = sibling.grade || 'N/A';
+                    const sourcedId = sibling.sourcedId || 'No ID';
+                    html += `
+                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                            <span class="field-label">${siblingName}</span>
+                            <span class="field-value" style="font-size: 12px; color: #666;">
+                                Grade ${grade} | ID: ${sourcedId}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
 
             return html;
         }
