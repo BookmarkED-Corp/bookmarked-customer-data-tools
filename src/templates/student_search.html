@@ -401,6 +401,25 @@
                 📥 Export Comparison
             </button>
 
+            <button class="toggle-log" onclick="toggleRawData()" style="display:none; margin-top: 10px;" id="toggle-raw-btn">
+                📋 Show Raw Data
+            </button>
+
+            <!-- Raw Data View -->
+            <div id="raw-data-view" class="debug-log" style="display:none; margin-top: 20px;">
+                <h3>📋 Raw Response Data</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h4 style="color: #4ec9b0; margin-bottom: 10px;">Bookmarked Database</h4>
+                        <pre id="raw-bookmarked" style="background: #2d2d2d; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 11px; line-height: 1.4;"></pre>
+                    </div>
+                    <div>
+                        <h4 style="color: #4ec9b0; margin-bottom: 10px;">ClassLink API</h4>
+                        <pre id="raw-classlink" style="background: #2d2d2d; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 11px; line-height: 1.4;"></pre>
+                    </div>
+                </div>
+            </div>
+
             <!-- Debug Log -->
             <button class="toggle-log" onclick="toggleDebugLog()">🔍 Show Debug Log</button>
             <div id="debug-log" class="debug-log" style="display:none;">
@@ -449,6 +468,19 @@
             } else {
                 debugLog.style.display = 'none';
                 button.textContent = '🔍 Show Debug Log';
+            }
+        }
+
+        function toggleRawData() {
+            const rawDataView = document.getElementById('raw-data-view');
+            const button = document.getElementById('toggle-raw-btn');
+
+            if (rawDataView.style.display === 'none') {
+                rawDataView.style.display = 'block';
+                button.textContent = '📋 Hide Raw Data';
+            } else {
+                rawDataView.style.display = 'none';
+                button.textContent = '📋 Show Raw Data';
             }
         }
 
@@ -641,9 +673,14 @@
             // Build ClassLink side
             classlinkDiv.innerHTML = buildDataFields(classlink, bookmarked);
 
-            // Show comparison
+            // Populate raw data view
+            document.getElementById('raw-bookmarked').textContent = JSON.stringify(bookmarked, null, 2);
+            document.getElementById('raw-classlink').textContent = classlink ? JSON.stringify(classlink, null, 2) : 'No ClassLink data available';
+
+            // Show comparison and buttons
             document.getElementById('comparison').classList.add('show');
             document.getElementById('export-btn').style.display = 'block';
+            document.getElementById('toggle-raw-btn').style.display = 'block';
         }
 
         // Build data fields
