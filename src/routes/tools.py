@@ -299,25 +299,27 @@ def search_student():
         # Get enrollment data if student found
         enrollments = []
         if bookmarked_data:
-            enrollment_query = """
-                SELECT
-                    e.id,
-                    e."classId",
-                    e.role,
-                    e.status,
-                    cl."className",
-                    cl."classCode",
-                    cl.period,
-                    cl.subject
-                FROM "Enrollment" e
-                LEFT JOIN "Class" cl ON e."classId" = cl.id
-                WHERE e."studentId" = :student_id
-                ORDER BY cl.period
-                LIMIT 20
-            """
-            enrollments = db.execute_query(enrollment_query, {
-                'student_id': bookmarked_data['id']
-            })
+            try:
+                enrollment_query = """
+                    SELECT
+                        e.id,
+                        e."sourcedId",
+                        e.role,
+                        e.status,
+                        e."beginDate",
+                        e."endDate"
+                    FROM "OneRosterEnrollment" e
+                    WHERE e."userId" = :student_sourced_id
+                    ORDER BY e."beginDate" DESC
+                    LIMIT 20
+                """
+                enrollments = db.execute_query(enrollment_query, {
+                    'student_sourced_id': bookmarked_data['sourcedId']
+                })
+                logger.info("Enrollments retrieved", count=len(enrollments))
+            except Exception as enrollment_error:
+                logger.warning("Failed to retrieve enrollments", error=str(enrollment_error))
+                # Continue without enrollments
 
         db.disconnect()
 
