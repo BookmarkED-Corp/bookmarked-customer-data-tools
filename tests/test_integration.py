@@ -141,11 +141,11 @@ class TestStudentSearch:
 class TestPageRendering:
     """Test that pages render correctly"""
 
-    def test_district_select_page(self):
-        """Test district selection page loads"""
-        response = requests.get(f"{BASE_URL}/district-select")
+    def test_tools_page(self):
+        """Test tools page with district selector loads"""
+        response = requests.get(f"{BASE_URL}/tools")
         assert response.status_code == 200
-        assert 'District Selection' in response.text
+        assert 'Diagnostic Tools' in response.text
 
     def test_student_search_page(self):
         """Test student search page loads"""

@@ -119,7 +119,7 @@ def create_app(config_name='development'):
                         <strong>Student Search & Comparison Tool</strong> - Search for students across environments
                         and compare ClassLink/OneRoster data with Bookmarked database.
                     </p>
-                    <a href="/district-select" style="
+                    <a href="/tools" style="
                         display: inline-block;
                         background: #15b79e;
                         color: white;

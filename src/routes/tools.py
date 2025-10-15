@@ -19,10 +19,11 @@ def tools_dashboard():
     return render_template('tools.html')
 
 
-@tools_bp.route('/district-select')
-def district_select():
-    """Display district selection page"""
-    return render_template('district_select.html')
+# Deprecated: Use /tools instead which has integrated district selector
+# @tools_bp.route('/district-select')
+# def district_select():
+#     """Display district selection page"""
+#     return render_template('district_select.html')
 
 
 @tools_bp.route('/tools/student-search')

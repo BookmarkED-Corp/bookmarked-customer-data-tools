@@ -8,15 +8,14 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('District Selection', () => {
   test('should load the district select page', async ({ page }) => {
-    await page.goto('/district-select');
+    await page.goto('/tools');
 
     // Check header
-    await expect(page.locator('h1')).toContainText('Select District');
-    await expect(page.locator('p')).toContainText('Choose an environment and district');
+    await expect(page.locator('h1')).toContainText('Diagnostic Tools');
   });
 
   test('should have environment selector with staging and production', async ({ page }) => {
-    await page.goto('/district-select');
+    await page.goto('/tools');
 
     const envSelect = page.locator('#environment-select');
     await expect(envSelect).toBeVisible();
@@ -27,44 +26,53 @@ test.describe('District Selection', () => {
   });
 
   test('should load districts from API when environment is selected', async ({ page }) => {
-    await page.goto('/district-select');
+    await page.goto('/tools');
 
     // Select staging environment
     await page.locator('#environment-select').selectOption('staging');
 
+    // Type at least 3 characters to search
+    await page.locator('#district-search').fill('test');
+
     // Wait for districts to load
     await page.waitForTimeout(3000);
 
-    // Check that district list is visible
-    const districtList = page.locator('#district-list');
-    await expect(districtList).toBeVisible();
-
-    // Should have at least one district
-    const districts = page.locator('.district-item');
-    await expect(districts.first()).toBeVisible();
+    // Check that district results are visible
+    const districtResults = page.locator('#district-results');
+    await expect(districtResults).toBeVisible();
 
     console.log('✅ Districts loaded from staging');
   });
 
   test('should display district information correctly', async ({ page }) => {
-    await page.goto('/district-select');
+    await page.goto('/tools');
     await page.locator('#environment-select').selectOption('staging');
+
+    // Type at least 3 characters to search
+    await page.locator('#district-search').fill('test');
     await page.waitForTimeout(3000);
 
-    // Check first district item has name
-    const firstDistrict = page.locator('.district-item').first();
-    await expect(firstDistrict.locator('.district-name')).not.toBeEmpty();
+    // Check first district result has name
+    const firstDistrict = page.locator('.district-result-item').first();
+    await expect(firstDistrict).toBeVisible();
 
     console.log('✅ District information displayed');
   });
 
   test('should select a district and proceed to search', async ({ page }) => {
-    await page.goto('/district-select');
+    await page.goto('/tools');
     await page.locator('#environment-select').selectOption('staging');
+
+    // Type at least 3 characters to search
+    await page.locator('#district-search').fill('test');
     await page.waitForTimeout(3000);
 
-    // Click first district
-    await page.locator('.district-item').first().click();
+    // Click first district result
+    await page.locator('.district-result-item').first().click();
+    await page.waitForTimeout(500);
+
+    // Click Launch Student Search button
+    await page.locator('#btn-student-search').click();
 
     // Should navigate to student search page
     await page.waitForURL('**/tools/student-search');
