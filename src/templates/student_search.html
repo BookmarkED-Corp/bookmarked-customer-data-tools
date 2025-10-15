@@ -233,6 +233,72 @@
         .export-button:hover {
             background: #0f9582;
         }
+
+        .debug-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .debug-log h3 {
+            color: #4ec9b0;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-left: 3px solid #4ec9b0;
+            background: rgba(78, 201, 176, 0.1);
+        }
+
+        .log-entry.error {
+            border-left-color: #f48771;
+            background: rgba(244, 135, 113, 0.1);
+        }
+
+        .log-entry.success {
+            border-left-color: #89d185;
+            background: rgba(137, 209, 133, 0.1);
+        }
+
+        .log-entry .timestamp {
+            color: #858585;
+            font-size: 11px;
+        }
+
+        .log-entry .message {
+            color: #d4d4d4;
+            margin-top: 4px;
+        }
+
+        .log-entry .data {
+            color: #ce9178;
+            margin-top: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .toggle-log {
+            background: #1e1e1e;
+            color: #4ec9b0;
+            border: 1px solid #4ec9b0;
+            padding: 8px 16px;
+            margin-top: 20px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .toggle-log:hover {
+            background: #2d2d2d;
+        }
     </style>
 </head>
 <body>
@@ -292,6 +358,13 @@
             <button class="export-button" onclick="exportResults()" style="display:none;" id="export-btn">
                 📥 Export Comparison
             </button>
+
+            <!-- Debug Log -->
+            <button class="toggle-log" onclick="toggleDebugLog()">🔍 Show Debug Log</button>
+            <div id="debug-log" class="debug-log" style="display:none;">
+                <h3>🔍 Debug Log</h3>
+                <div id="log-entries"></div>
+            </div>
         </div>
     </div>
 
@@ -301,6 +374,49 @@
         let selectedDistrictName = sessionStorage.getItem('selected_district_name') || '--';
         let currentResults = null;
 
+        // Debug logging functions
+        function addLog(message, data = null, type = 'info') {
+            const logEntries = document.getElementById('log-entries');
+            const timestamp = new Date().toLocaleTimeString();
+
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry ${type}`;
+
+            let html = `<div class="timestamp">[${timestamp}]</div>`;
+            html += `<div class="message">${message}</div>`;
+
+            if (data) {
+                html += `<div class="data">${typeof data === 'object' ? JSON.stringify(data, null, 2) : data}</div>`;
+            }
+
+            logEntry.innerHTML = html;
+            logEntries.insertBefore(logEntry, logEntries.firstChild);
+
+            // Auto-scroll to top
+            const debugLog = document.getElementById('debug-log');
+            debugLog.scrollTop = 0;
+        }
+
+        function toggleDebugLog() {
+            const debugLog = document.getElementById('debug-log');
+            const button = event.target;
+
+            if (debugLog.style.display === 'none') {
+                debugLog.style.display = 'block';
+                button.textContent = '🔍 Hide Debug Log';
+            } else {
+                debugLog.style.display = 'none';
+                button.textContent = '🔍 Show Debug Log';
+            }
+        }
+
+        // Log initial state
+        addLog('Page loaded', {
+            environment: selectedEnvironment,
+            districtId: selectedDistrictId,
+            districtName: selectedDistrictName
+        });
+
         // Display current district
         document.getElementById('current-district').textContent = selectedDistrictName;
         document.getElementById('current-district-id').textContent = selectedDistrictId || '--';
@@ -309,18 +425,35 @@
         if (!selectedDistrictId) {
             document.getElementById('district-info').className = 'alert error';
             document.getElementById('district-info').innerHTML = '<strong>Error:</strong> No district selected. <a href="/tools" style="color: #721c24; font-weight: 600; text-decoration: underline;">Go to Tools to select a district</a>';
+            addLog('No district selected - user needs to select district from /tools', null, 'error');
+
+            // Show debug log automatically when there's an error
+            document.getElementById('debug-log').style.display = 'block';
+            document.querySelector('.toggle-log').textContent = '🔍 Hide Debug Log';
+        } else {
+            // Parse district_id as integer for API call
+            selectedDistrictId = parseInt(selectedDistrictId, 10);
+            addLog('District selected successfully', {
+                districtId: selectedDistrictId,
+                districtName: selectedDistrictName,
+                environment: selectedEnvironment
+            }, 'success');
         }
 
         // Search for student
         async function searchStudent() {
             const searchTerm = document.getElementById('search-term').value.trim();
 
+            addLog('Search initiated', { searchTerm });
+
             if (!searchTerm) {
+                addLog('Validation failed: No search term provided', null, 'error');
                 alert('Please enter a search term');
                 return;
             }
 
             if (!selectedDistrictId) {
+                addLog('Validation failed: No district selected', null, 'error');
                 alert('No district selected. Please go back and select a district.');
                 return;
             }
@@ -331,31 +464,46 @@
             document.getElementById('comparison').classList.remove('show');
             document.getElementById('export-btn').style.display = 'none';
 
+            const requestBody = {
+                search_term: searchTerm,
+                district_id: selectedDistrictId,
+                environment: selectedEnvironment
+            };
+
+            addLog('Sending API request to /api/students/search', requestBody);
+
             try {
                 const response = await fetch(`/api/students/search`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        search_term: searchTerm,
-                        district_id: selectedDistrictId,
-                        environment: selectedEnvironment
-                    })
+                    body: JSON.stringify(requestBody)
+                });
+
+                addLog('Received API response', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    ok: response.ok
                 });
 
                 const result = await response.json();
 
+                addLog('Parsed API response', result, response.ok ? 'success' : 'error');
+
                 document.getElementById('loading').style.display = 'none';
 
                 if (result.success && result.student) {
+                    addLog('Student found, displaying comparison', null, 'success');
                     currentResults = result;
                     displayComparison(result);
                 } else {
+                    addLog('No student found', { message: result.message || 'No match' }, 'error');
                     document.getElementById('no-results').style.display = 'block';
                 }
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
+                addLog('API request failed with exception', { error: error.message, stack: error.stack }, 'error');
                 alert('Error searching student: ' + error.message);
             }
         }
