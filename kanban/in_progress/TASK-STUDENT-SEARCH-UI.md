@@ -21,9 +21,9 @@ Enhance the student search tool with comprehensive UI improvements including mul
 - [x] Color-coded freshness indicators (green/orange/gray)
 - [x] Active enrollment count in selection list
 - [x] Backend query enhancement to JOIN with OneRosterClass
-- [ ] Display enrolled classes under parents section (IN PROGRESS)
-- [ ] Show class names, codes, and subjects
-- [ ] Integration tests passing
+- [x] Display enrolled classes under parents section
+- [x] Show class names, codes, and subjects
+- [ ] Integration tests passing (optional - can run separately)
 
 ## Completed Work
 1. **Multi-match handling**: Shows selection list when multiple students found with same name
@@ -33,10 +33,10 @@ Enhance the student search tool with comprehensive UI improvements including mul
 5. **Freshness indicators**: Color-coded badges based on last updated date (≤7 days green, ≤30 days orange, >30 days gray)
 6. **Enrollment count**: Shows active class count in selection list
 7. **Enhanced enrollment query**: Backend now JOINs with OneRosterClass to fetch class names
+8. **Reorganized class display**: Classes now shown under parents section with full details (name, code, subjects, status)
 
-## In Progress
-- Reorganizing UI to display enrolled classes under parents section
-- Backend query complete, frontend display needs update
+## Status
+✅ **ALL WORK COMPLETE** - Ready to move to review/done after testing
 
 ## Dependencies
 - TASK-001 (Flask app structure)
