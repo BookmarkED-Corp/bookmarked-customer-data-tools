@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Search - Customer Data Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #183162;
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header nav {
+            margin-top: 15px;
+        }
+
+        .header nav a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.9;
+            margin-right: 20px;
+        }
+
+        .header nav a:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        .content {
+            background: white;
+            padding: 40px;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .search-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 10px;
+            align-items: end;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-search {
+            background: #ff6227;
+            color: white;
+        }
+
+        .btn-search:hover {
+            background: #e5551f;
+        }
+
+        .btn-search:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 30px;
+            display: none;
+        }
+
+        .comparison.show {
+            display: grid;
+        }
+
+        .comparison-column {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .comparison-column h3 {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .comparison-column.bookmarked h3 {
+            color: #183162;
+        }
+
+        .comparison-column.classlink h3 {
+            color: #ff6227;
+        }
+
+        .field-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .field-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .field-value {
+            text-align: right;
+            color: #333;
+        }
+
+        .field-value.match {
+            color: #15b79e;
+        }
+
+        .field-value.mismatch {
+            color: #ff4444;
+            font-weight: 600;
+        }
+
+        .field-value.missing {
+            color: #ff4444;
+            font-style: italic;
+        }
+
+        .indicator {
+            margin-left: 8px;
+        }
+
+        .indicator.match {
+            color: #15b79e;
+        }
+
+        .indicator.mismatch {
+            color: #ff4444;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .alert.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .export-button {
+            background: #15b79e;
+            color: white;
+            float: right;
+            margin-top: 20px;
+        }
+
+        .export-button:hover {
+            background: #0f9582;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Find Student</h1>
+            <nav>
+                <a href="/district-select">← Back to District Selection</a>
+                <a href="/connections/setup">⚙ Settings</a>
+            </nav>
+        </div>
+
+        <div class="content">
+            <div id="district-info" class="alert info">
+                <strong>Selected District:</strong> <span id="current-district">--</span><br>
+                <strong>Environment:</strong> <span id="current-environment">--</span>
+            </div>
+
+            <!-- Search Form -->
+            <div class="search-section">
+                <h2>Search Student</h2>
+                <div class="search-form">
+                    <div class="form-group">
+                        <label for="search-term">Student ID, Name, or Email</label>
+                        <input type="text" id="search-term" placeholder="Enter student ID, name, or email...">
+                    </div>
+                    <button class="btn-search" onclick="searchStudent()">Search</button>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="loading" class="loading" style="display:none;">
+                Searching for student in both systems...
+            </div>
+
+            <!-- No Results -->
+            <div id="no-results" class="no-results" style="display:none;">
+                No student found matching your search criteria.
+            </div>
+
+            <!-- Side-by-Side Comparison -->
+            <div id="comparison" class="comparison">
+                <!-- Bookmarked Data -->
+                <div class="comparison-column bookmarked">
+                    <h3>📊 Bookmarked Database</h3>
+                    <div id="bookmarked-data"></div>
+                </div>
+
+                <!-- ClassLink Data -->
+                <div class="comparison-column classlink">
+                    <h3>🔗 ClassLink API</h3>
+                    <div id="classlink-data"></div>
+                </div>
+            </div>
+
+            <button class="export-button" onclick="exportResults()" style="display:none;" id="export-btn">
+                📥 Export Comparison
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let selectedEnvironment = sessionStorage.getItem('selected_environment') || 'staging';
+        let selectedDistrictId = sessionStorage.getItem('selected_district_id');
+        let selectedDistrictName = sessionStorage.getItem('selected_district_name') || '--';
+        let currentResults = null;
+
+        // Display current district
+        document.getElementById('current-district').textContent = selectedDistrictName;
+        document.getElementById('current-environment').textContent = selectedEnvironment.toUpperCase();
+
+        if (!selectedDistrictId) {
+            document.getElementById('district-info').className = 'alert error';
+            document.getElementById('district-info').innerHTML = '<strong>Error:</strong> No district selected. Please go back and select a district first.';
+        }
+
+        // Search for student
+        async function searchStudent() {
+            const searchTerm = document.getElementById('search-term').value.trim();
+
+            if (!searchTerm) {
+                alert('Please enter a search term');
+                return;
+            }
+
+            if (!selectedDistrictId) {
+                alert('No district selected. Please go back and select a district.');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('comparison').classList.remove('show');
+            document.getElementById('export-btn').style.display = 'none';
+
+            try {
+                const response = await fetch(`/api/students/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        search_term: searchTerm,
+                        district_id: selectedDistrictId,
+                        environment: selectedEnvironment
+                    })
+                });
+
+                const result = await response.json();
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (result.success && result.student) {
+                    currentResults = result;
+                    displayComparison(result);
+                } else {
+                    document.getElementById('no-results').style.display = 'block';
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                alert('Error searching student: ' + error.message);
+            }
+        }
+
+        // Display comparison
+        function displayComparison(data) {
+            const bookmarkedDiv = document.getElementById('bookmarked-data');
+            const classlinkDiv = document.getElementById('classlink-data');
+
+            const bookmarked = data.bookmarked_data || {};
+            const classlink = data.classlink_data || {};
+
+            // Build Bookmarked side
+            bookmarkedDiv.innerHTML = buildDataFields(bookmarked, classlink);
+
+            // Build ClassLink side
+            classlinkDiv.innerHTML = buildDataFields(classlink, bookmarked);
+
+            // Show comparison
+            document.getElementById('comparison').classList.add('show');
+            document.getElementById('export-btn').style.display = 'block';
+        }
+
+        // Build data fields
+        function buildDataFields(data, compareData) {
+            if (!data || Object.keys(data).length === 0) {
+                return '<div class="no-results">No data found</div>';
+            }
+
+            let html = '';
+
+            const fields = [
+                { key: 'sourcedId', label: 'Source ID' },
+                { key: 'givenName', label: 'First Name' },
+                { key: 'familyName', label: 'Last Name' },
+                { key: 'email', label: 'Email' },
+                { key: 'grade', label: 'Grade' },
+                { key: 'campus', label: 'Campus' },
+                { key: 'isDeleted', label: 'Is Deleted' },
+                { key: 'createdAt', label: 'Created' },
+                { key: 'updatedAt', label: 'Updated' }
+            ];
+
+            fields.forEach(field => {
+                const value = data[field.key];
+                const compareValue = compareData ? compareData[field.key] : null;
+
+                let className = '';
+                let indicator = '';
+
+                if (value && compareValue) {
+                    if (String(value).toLowerCase() === String(compareValue).toLowerCase()) {
+                        className = 'match';
+                        indicator = '<span class="indicator match">✓</span>';
+                    } else {
+                        className = 'mismatch';
+                        indicator = '<span class="indicator mismatch">✗</span>';
+                    }
+                } else if (!value && compareValue) {
+                    className = 'missing';
+                    indicator = '<span class="indicator mismatch">✗</span>';
+                }
+
+                html += `
+                    <div class="field-row">
+                        <span class="field-label">${field.label}:</span>
+                        <span class="field-value ${className}">
+                            ${value || '<em>Not found</em>'}
+                            ${indicator}
+                        </span>
+                    </div>
+                `;
+            });
+
+            return html;
+        }
+
+        // Export results
+        function exportResults() {
+            if (!currentResults) return;
+
+            const csv = generateCSV(currentResults);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `student-comparison-${new Date().toISOString().slice(0,10)}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Generate CSV
+        function generateCSV(data) {
+            const headers = ['Field', 'Bookmarked', 'ClassLink', 'Match'];
+            const rows = [];
+
+            const fields = ['sourcedId', 'givenName', 'familyName', 'email', 'grade', 'campus', 'status'];
+
+            fields.forEach(field => {
+                const bookmarkedValue = data.bookmarked_data ? data.bookmarked_data[field] : '';
+                const classlinkValue = data.classlink_data ? data.classlink_data[field] : '';
+                const match = bookmarkedValue === classlinkValue ? 'Yes' : 'No';
+
+                rows.push([field, bookmarkedValue || '', classlinkValue || '', match]);
+            });
+
+            let csv = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+            });
+
+            return csv;
+        }
+
+        // Allow search on Enter key
+        document.getElementById('search-term').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchStudent();
+            }
+        });
+    </script>
+</body>
+</html>

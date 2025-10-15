@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select District - Customer Data Tools</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f8f9fa;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: #183162;
+            color: white;
+            padding: 30px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .header nav {
+            margin-top: 15px;
+        }
+
+        .header nav a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.9;
+            margin-right: 20px;
+        }
+
+        .header nav a:hover {
+            opacity: 1;
+            text-decoration: underline;
+        }
+
+        .content {
+            background: white;
+            padding: 40px;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section h2 {
+            color: #183162;
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        select, button {
+            width: 100%;
+            padding: 12px;
+            font-size: 14px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background: #ff6227;
+            color: white;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #e5551f;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .badge.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .district-info {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .district-info.show {
+            display: block;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .info-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .tools-section {
+            margin-top: 40px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .tools-section.enabled {
+            display: block;
+        }
+
+        .tools-section h2 {
+            margin-bottom: 20px;
+        }
+
+        .tool-button {
+            width: 100%;
+            padding: 16px;
+            margin-bottom: 10px;
+            background: #15b79e;
+            color: white;
+            text-align: left;
+            font-size: 16px;
+        }
+
+        .tool-button:hover {
+            background: #0f9582;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏫 District Selection</h1>
+            <nav>
+                <a href="/connections/setup">← Back to Settings</a>
+            </nav>
+        </div>
+
+        <div class="content">
+            <!-- Environment Selection -->
+            <div class="section">
+                <h2>1. Select Environment</h2>
+                <label>
+                    <input type="radio" name="environment" value="staging" checked onchange="loadDistricts()">
+                    Staging
+                </label>
+                <label>
+                    <input type="radio" name="environment" value="production" onchange="loadDistricts()">
+                    Production
+                </label>
+            </div>
+
+            <!-- District Selection -->
+            <div class="section">
+                <h2>2. Select District</h2>
+                <div id="loading" class="loading" style="display:none;">Loading districts...</div>
+                <select id="district-select" onchange="selectDistrict()">
+                    <option value="">-- Select a District --</option>
+                </select>
+                <button onclick="loadDistricts()">🔄 Refresh Districts</button>
+            </div>
+
+            <!-- ClassLink Validation -->
+            <div id="district-info" class="district-info">
+                <h3>District Information</h3>
+                <div class="info-row">
+                    <span class="info-label">District Name:</span>
+                    <span id="info-name">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">District ID:</span>
+                    <span id="info-id">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Environment:</span>
+                    <span id="info-env">--</span>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <span id="classlink-badge" class="badge"></span>
+                </div>
+            </div>
+
+            <!-- General Tools -->
+            <div id="tools-section" class="tools-section">
+                <h2>📋 General Tools</h2>
+                <button class="tool-button" onclick="openStudentSearch()">
+                    🔍 Find Student in Database and ClassLink
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedEnvironment = 'staging';
+        let selectedDistrictId = null;
+        let selectedDistrictName = null;
+
+        // Load districts from API/DB
+        async function loadDistricts() {
+            const loading = document.getElementById('loading');
+            const select = document.getElementById('district-select');
+
+            loading.style.display = 'block';
+            select.disabled = true;
+
+            // Get selected environment
+            selectedEnvironment = document.querySelector('input[name="environment"]:checked').value;
+
+            try {
+                const response = await fetch(`/api/districts?environment=${selectedEnvironment}`);
+                const result = await response.json();
+
+                // Clear existing options
+                select.innerHTML = '<option value="">-- Select a District --</option>';
+
+                if (result.success && result.districts) {
+                    result.districts.forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district.id;
+                        option.textContent = `${district.name} (ID: ${district.id})`;
+                        select.appendChild(option);
+                    });
+                } else {
+                    alert('Failed to load districts: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error loading districts: ' + error.message);
+            }
+
+            loading.style.display = 'none';
+            select.disabled = false;
+        }
+
+        // Select district and check ClassLink data
+        async function selectDistrict() {
+            const select = document.getElementById('district-select');
+            const districtId = select.value;
+
+            if (!districtId) {
+                document.getElementById('district-info').classList.remove('show');
+                document.getElementById('tools-section').classList.remove('enabled');
+                return;
+            }
+
+            selectedDistrictId = districtId;
+            selectedDistrictName = select.options[select.selectedIndex].text;
+
+            // Update district info
+            document.getElementById('info-name').textContent = selectedDistrictName;
+            document.getElementById('info-id').textContent = districtId;
+            document.getElementById('info-env').textContent = selectedEnvironment.toUpperCase();
+            document.getElementById('district-info').classList.add('show');
+
+            // Check ClassLink historical data
+            try {
+                const response = await fetch(`/api/districts/${districtId}/classlink?environment=${selectedEnvironment}`);
+                const result = await response.json();
+
+                const badge = document.getElementById('classlink-badge');
+
+                if (result.has_classlink_data) {
+                    badge.className = 'badge success';
+                    badge.innerHTML = '✓ Historical ClassLink data found';
+                    if (result.last_sync) {
+                        badge.innerHTML += `<br><small>Last sync: ${result.last_sync}</small>`;
+                    }
+
+                    // Enable tools section
+                    document.getElementById('tools-section').classList.add('enabled');
+                } else {
+                    badge.className = 'badge error';
+                    badge.innerHTML = '✗ NO ClassLink data found';
+
+                    // Still enable tools but show warning
+                    document.getElementById('tools-section').classList.add('enabled');
+                }
+            } catch (error) {
+                console.error('Error checking ClassLink data:', error);
+            }
+        }
+
+        // Open student search tool
+        function openStudentSearch() {
+            if (!selectedDistrictId) {
+                alert('Please select a district first');
+                return;
+            }
+
+            // Store selection in session and navigate
+            sessionStorage.setItem('selected_environment', selectedEnvironment);
+            sessionStorage.setItem('selected_district_id', selectedDistrictId);
+            sessionStorage.setItem('selected_district_name', selectedDistrictName);
+
+            window.location.href = '/tools/student-search';
+        }
+
+        // Load districts on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadDistricts();
+        });
+    </script>
+</body>
+</html>

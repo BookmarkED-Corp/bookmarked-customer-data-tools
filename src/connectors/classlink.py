@@ -2,25 +2,147 @@
 ClassLink API Connector
 
 Connector for ClassLink SIS integration platform.
+Fetches OAuth credentials dynamically per district and accesses OneRoster data.
 """
 import requests
 from typing import Dict, Any, List, Optional
 import structlog
+import hmac
+import hashlib
+import base64
+from urllib.parse import quote, urlparse
+import time
 
 logger = structlog.get_logger(__name__)
+
+
+class OneRosterClient:
+    """OAuth 1.0a client for OneRoster API"""
+
+    def __init__(self, client_id: str, client_secret: str):
+        """
+        Initialize OneRoster client with OAuth credentials
+
+        Args:
+            client_id: OAuth 1.0a client ID
+            client_secret: OAuth 1.0a client secret
+        """
+        self.client_id = client_id
+        self.client_secret = client_secret
+
+    def _generate_oauth_signature(self, method: str, url: str, params: Dict[str, str]) -> str:
+        """
+        Generate OAuth 1.0a HMAC-SHA256 signature
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: Full request URL
+            params: Request parameters including OAuth params
+
+        Returns:
+            Base64-encoded signature
+        """
+        # Sort parameters
+        sorted_params = sorted(params.items())
+
+        # Create parameter string
+        param_string = '&'.join([f'{quote(str(k), safe="")}={quote(str(v), safe="")}'
+                                 for k, v in sorted_params])
+
+        # Create signature base string
+        parsed_url = urlparse(url)
+        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
+        signature_base = f"{method.upper()}&{quote(base_url, safe='')}&{quote(param_string, safe='')}"
+
+        # Create signing key (consumer_secret&token_secret, but token_secret is empty for 2-legged OAuth)
+        signing_key = f"{quote(self.client_secret, safe='')}&"
+
+        # Generate HMAC-SHA256 signature
+        signature = hmac.new(
+            signing_key.encode('utf-8'),
+            signature_base.encode('utf-8'),
+            hashlib.sha256
+        ).digest()
+
+        return base64.b64encode(signature).decode('utf-8')
+
+    def make_request(self, url: str, params: Optional[Dict[str, Any]] = None) -> Optional[Dict]:
+        """
+        Make authenticated request to OneRoster API
+
+        Args:
+            url: Full URL to request
+            params: Query parameters
+
+        Returns:
+            JSON response or None
+        """
+        import random
+        import string
+
+        params = params or {}
+
+        # Generate OAuth parameters (matching production: bookmarked-back/src/classlink/one-roster.ts)
+        timestamp = str(int(time.time()))
+
+        # Generate nonce: random alphanumeric string with length = timestamp length (usually 10)
+        # See one-roster.ts line 28: generateNonce(timestamp.length)
+        nonce_length = len(timestamp)
+        nonce = ''.join(random.choices(string.ascii_letters + string.digits, k=nonce_length))
+
+        oauth_params = {
+            'oauth_consumer_key': self.client_id,
+            'oauth_signature_method': 'HMAC-SHA256',
+            'oauth_timestamp': timestamp,
+            'oauth_nonce': nonce,
+            # Note: Production does NOT include oauth_version
+        }
+
+        # Combine all parameters for signature
+        all_params = {**params, **oauth_params}
+
+        # Generate signature
+        signature = self._generate_oauth_signature('GET', url, all_params)
+        oauth_params['oauth_signature'] = signature
+
+        # Build Authorization header
+        auth_header = 'OAuth ' + ', '.join([f'{k}="{quote(str(v), safe="")}"'
+                                            for k, v in sorted(oauth_params.items())])
+
+        headers = {
+            'Authorization': auth_header,
+            'Content-Type': 'application/json'
+        }
+
+        try:
+            response = requests.get(url, headers=headers, params=params, timeout=30)
+
+            if response.status_code == 200:
+                return response.json()
+            else:
+                logger.error("OneRoster API request failed",
+                           url=url,
+                           status_code=response.status_code,
+                           response=response.text[:200])
+                return None
+
+        except Exception as e:
+            logger.error("OneRoster API request error", url=url, error=str(e))
+            return None
 
 
 class ClassLinkConnector:
     """Connector for ClassLink API"""
 
-    def __init__(self, api_url: str = 'https://api.classlink.com/v2'):
+    def __init__(self, api_url: str = 'https://oneroster-proxy.classlink.io'):
         """
         Initialize ClassLink connector
 
         Args:
-            api_url: Base URL for ClassLink API
+            api_url: Base URL for ClassLink API (default: production proxy used by bookmarked-back)
         """
         self.api_url = api_url.rstrip('/')
+        self._district_cache = {}  # Cache district credentials
 
     def test_connection(self, api_key: str) -> Dict[str, Any]:
         """
@@ -38,27 +160,28 @@ class ClassLinkConnector:
                 'Content-Type': 'application/json'
             }
 
-            # Test connection by getting district info
+            # Test connection by getting district/application list
+            # Note: Production uses /applications endpoint (see bookmarked-back/.api/apis/classlink/index.ts line 91)
             response = requests.get(
-                f'{self.api_url}/my/info',
+                f'{self.api_url}/applications',
                 headers=headers,
                 timeout=10
             )
 
             if response.status_code == 200:
-                district_data = response.json()
+                data = response.json()
+                applications = data.get('applications', [])
 
                 logger.info("ClassLink connection test successful",
-                           district_id=district_data.get('districtId'),
-                           district_name=district_data.get('districtName'))
+                           district_count=len(applications))
 
                 return {
                     'success': True,
-                    'message': 'Connected to ClassLink successfully',
+                    'message': f'Connected to ClassLink successfully - {len(applications)} districts available',
                     'details': {
-                        'district_id': district_data.get('districtId'),
-                        'district_name': district_data.get('districtName'),
-                        'tenant_id': district_data.get('tenantId')
+                        'district_count': len(applications),
+                        'districts': [{'id': app.get('id'), 'name': app.get('name')}
+                                     for app in applications[:5]]  # First 5 districts
                     }
                 }
             else:
@@ -94,314 +217,231 @@ class ClassLinkConnector:
                 'details': None
             }
 
-    def get_schools(self, api_key: str, limit: int = 100) -> List[Dict]:
+    def get_district_credentials(self, bearer_token: str, oneroster_app_id: str) -> Optional[Dict[str, Any]]:
         """
-        Get all schools/orgs from ClassLink
+        Fetch OAuth credentials for a specific district
+
+        This calls the ClassLink API to get the OneRoster endpoint and OAuth credentials
+        for a specific district, just like the production backend does.
 
         Args:
-            api_key: ClassLink API key
-            limit: Maximum number of results (default 100)
+            bearer_token: ClassLink Bearer token
+            oneroster_app_id: OneRoster application ID (from ClasslinkApplication.oneroster_application_id)
+                             This is the URL-encoded ID like "XHkpmX1KunU%3D"
 
         Returns:
-            List of school dictionaries
+            Dict with endpoint_url, client_id, client_secret or None
         """
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
+        # Check cache first
+        cache_key = f"{oneroster_app_id}"
+        if cache_key in self._district_cache:
+            logger.debug("Using cached credentials", oneroster_app_id=oneroster_app_id)
+            return self._district_cache[cache_key]
 
         try:
+            headers = {
+                'Authorization': f'Bearer {bearer_token}',
+                'Content-Type': 'application/json'
+            }
+
+            # Get district server details
             response = requests.get(
-                f'{self.api_url}/orgs',
-                headers=headers,
-                params={'limit': limit},
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                schools = data.get('orgs', [])
-                logger.info("Retrieved ClassLink schools", count=len(schools))
-                return schools
-            else:
-                logger.error("Failed to get ClassLink schools",
-                            status_code=response.status_code)
-                return []
-
-        except Exception as e:
-            logger.error("Error getting ClassLink schools", error=str(e))
-            return []
-
-    def get_students(self, api_key: str, school_id: Optional[str] = None,
-                    limit: int = 1000) -> List[Dict]:
-        """
-        Get students from ClassLink
-
-        Args:
-            api_key: ClassLink API key
-            school_id: Optional school ID to filter by
-            limit: Maximum number of results (default 1000)
-
-        Returns:
-            List of student dictionaries
-        """
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-
-        params = {'limit': limit}
-        if school_id:
-            params['schoolSourcedId'] = school_id
-
-        try:
-            response = requests.get(
-                f'{self.api_url}/users',
-                headers=headers,
-                params=params,
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                users = data.get('users', [])
-                # Filter for students only
-                students = [u for u in users if u.get('role') == 'student']
-                logger.info("Retrieved ClassLink students", count=len(students))
-                return students
-            else:
-                logger.error("Failed to get ClassLink students",
-                            status_code=response.status_code)
-                return []
-
-        except Exception as e:
-            logger.error("Error getting ClassLink students", error=str(e))
-            return []
-
-    def get_teachers(self, api_key: str, school_id: Optional[str] = None,
-                    limit: int = 1000) -> List[Dict]:
-        """
-        Get teachers from ClassLink
-
-        Args:
-            api_key: ClassLink API key
-            school_id: Optional school ID to filter by
-            limit: Maximum number of results (default 1000)
-
-        Returns:
-            List of teacher dictionaries
-        """
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-
-        params = {'limit': limit}
-        if school_id:
-            params['schoolSourcedId'] = school_id
-
-        try:
-            response = requests.get(
-                f'{self.api_url}/users',
-                headers=headers,
-                params=params,
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                users = data.get('users', [])
-                # Filter for teachers only
-                teachers = [u for u in users if u.get('role') == 'teacher']
-                logger.info("Retrieved ClassLink teachers", count=len(teachers))
-                return teachers
-            else:
-                logger.error("Failed to get ClassLink teachers",
-                            status_code=response.status_code)
-                return []
-
-        except Exception as e:
-            logger.error("Error getting ClassLink teachers", error=str(e))
-            return []
-
-    def get_classes(self, api_key: str, school_id: Optional[str] = None,
-                   limit: int = 1000) -> List[Dict]:
-        """
-        Get classes/courses from ClassLink
-
-        Args:
-            api_key: ClassLink API key
-            school_id: Optional school ID to filter by
-            limit: Maximum number of results (default 1000)
-
-        Returns:
-            List of class dictionaries
-        """
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-
-        params = {'limit': limit}
-        if school_id:
-            params['schoolSourcedId'] = school_id
-
-        try:
-            response = requests.get(
-                f'{self.api_url}/classes',
-                headers=headers,
-                params=params,
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                classes = data.get('classes', [])
-                logger.info("Retrieved ClassLink classes", count=len(classes))
-                return classes
-            else:
-                logger.error("Failed to get ClassLink classes",
-                            status_code=response.status_code)
-                return []
-
-        except Exception as e:
-            logger.error("Error getting ClassLink classes", error=str(e))
-            return []
-
-    def get_enrollments(self, api_key: str, class_id: Optional[str] = None,
-                       limit: int = 1000) -> List[Dict]:
-        """
-        Get enrollments from ClassLink
-
-        Args:
-            api_key: ClassLink API key
-            class_id: Optional class ID to filter by
-            limit: Maximum number of results (default 1000)
-
-        Returns:
-            List of enrollment dictionaries
-        """
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-
-        params = {'limit': limit}
-        if class_id:
-            params['classSourcedId'] = class_id
-
-        try:
-            response = requests.get(
-                f'{self.api_url}/enrollments',
-                headers=headers,
-                params=params,
-                timeout=30
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                enrollments = data.get('enrollments', [])
-                logger.info("Retrieved ClassLink enrollments", count=len(enrollments))
-                return enrollments
-            else:
-                logger.error("Failed to get ClassLink enrollments",
-                            status_code=response.status_code)
-                return []
-
-        except Exception as e:
-            logger.error("Error getting ClassLink enrollments", error=str(e))
-            return []
-
-    def get_student_by_id(self, api_key: str, student_id: str) -> Optional[Dict]:
-        """
-        Get a specific student by ID
-
-        Args:
-            api_key: ClassLink API key
-            student_id: Student sourcedId
-
-        Returns:
-            Student dictionary or None
-        """
-        headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
-        }
-
-        try:
-            response = requests.get(
-                f'{self.api_url}/users/{student_id}',
+                f'{self.api_url}/applications/{oneroster_app_id}/server',
                 headers=headers,
                 timeout=10
             )
 
             if response.status_code == 200:
                 data = response.json()
-                return data.get('user')
+                server_data = data.get('server', {})
+
+                credentials = {
+                    'endpoint_url': server_data.get('endpoint_url'),
+                    'client_id': server_data.get('client_id'),
+                    'client_secret': server_data.get('client_secret')
+                }
+
+                # Cache the credentials
+                self._district_cache[cache_key] = credentials
+
+                logger.info("Retrieved district credentials",
+                           oneroster_app_id=oneroster_app_id,
+                           endpoint_url=credentials['endpoint_url'])
+
+                return credentials
             else:
-                logger.error("Failed to get ClassLink student",
-                            student_id=student_id,
-                            status_code=response.status_code)
+                logger.error("Failed to get district credentials",
+                            oneroster_app_id=oneroster_app_id,
+                            status_code=response.status_code,
+                            response=response.text[:200])
                 return None
 
         except Exception as e:
-            logger.error("Error getting ClassLink student", student_id=student_id, error=str(e))
+            logger.error("Error getting district credentials",
+                        oneroster_app_id=oneroster_app_id,
+                        error=str(e))
             return None
 
-    def validate_data_quality(self, api_key: str) -> Dict[str, Any]:
+    def get_students(self, bearer_token: str, oneroster_app_id: str,
+                    limit: int = 100, offset: int = 0) -> List[Dict]:
         """
-        Validate ClassLink data quality and completeness
-
-        Checks for:
-        - Schools exist
-        - Students have required fields
-        - Teachers have required fields
-        - Classes have enrollments
-        - Data consistency
+        Get students from ClassLink for a specific district
 
         Args:
-            api_key: ClassLink API key
+            bearer_token: ClassLink Bearer token
+            oneroster_app_id: OneRoster application ID
+            limit: Maximum number of results (default 100)
+            offset: Offset for pagination (default 0)
+
+        Returns:
+            List of student dictionaries
+        """
+        # Get district credentials
+        creds = self.get_district_credentials(bearer_token, oneroster_app_id)
+        if not creds:
+            logger.error("Cannot get students - no credentials available")
+            return []
+
+        # Create OneRoster client
+        client = OneRosterClient(creds['client_id'], creds['client_secret'])
+
+        # Fetch students
+        url = f"{creds['endpoint_url']}/ims/oneroster/v1p1/users"
+        params = {'limit': limit, 'offset': offset, 'orderBy': 'asc'}
+
+        data = client.make_request(url, params)
+        if data:
+            users = data.get('users', [])
+            students = [u for u in users if u.get('role') == 'student']
+            logger.info("Retrieved students", count=len(students), oneroster_app_id=oneroster_app_id)
+            return students
+
+        return []
+
+    def get_schools(self, bearer_token: str, oneroster_app_id: str,
+                   limit: int = 100, offset: int = 0) -> List[Dict]:
+        """
+        Get schools/organizations from ClassLink for a specific district
+
+        Args:
+            bearer_token: ClassLink Bearer token
+            oneroster_app_id: OneRoster application ID
+            limit: Maximum number of results (default 100)
+            offset: Offset for pagination (default 0)
+
+        Returns:
+            List of organization dictionaries
+        """
+        # Get district credentials
+        creds = self.get_district_credentials(bearer_token, oneroster_app_id)
+        if not creds:
+            logger.error("Cannot get schools - no credentials available")
+            return []
+
+        # Create OneRoster client
+        client = OneRosterClient(creds['client_id'], creds['client_secret'])
+
+        # Fetch organizations
+        url = f"{creds['endpoint_url']}/ims/oneroster/v1p1/orgs"
+        params = {'limit': limit, 'offset': offset, 'orderBy': 'asc'}
+
+        data = client.make_request(url, params)
+        if data:
+            orgs = data.get('orgs', [])
+            logger.info("Retrieved schools", count=len(orgs), oneroster_app_id=oneroster_app_id)
+            return orgs
+
+        return []
+
+    def get_classes(self, bearer_token: str, oneroster_app_id: str,
+                   limit: int = 100, offset: int = 0) -> List[Dict]:
+        """
+        Get classes from ClassLink for a specific district
+
+        Args:
+            bearer_token: ClassLink Bearer token
+            oneroster_app_id: OneRoster application ID
+            limit: Maximum number of results (default 100)
+            offset: Offset for pagination (default 0)
+
+        Returns:
+            List of class dictionaries
+        """
+        # Get district credentials
+        creds = self.get_district_credentials(bearer_token, oneroster_app_id)
+        if not creds:
+            logger.error("Cannot get classes - no credentials available")
+            return []
+
+        # Create OneRoster client
+        client = OneRosterClient(creds['client_id'], creds['client_secret'])
+
+        # Fetch classes
+        url = f"{creds['endpoint_url']}/ims/oneroster/v1p1/classes"
+        params = {'limit': limit, 'offset': offset, 'orderBy': 'asc'}
+
+        data = client.make_request(url, params)
+        if data:
+            classes = data.get('classes', [])
+            logger.info("Retrieved classes", count=len(classes), oneroster_app_id=oneroster_app_id)
+            return classes
+
+        return []
+
+    def validate_district_data(self, bearer_token: str, oneroster_app_id: str) -> Dict[str, Any]:
+        """
+        Validate ClassLink data quality for a specific district
+
+        Args:
+            bearer_token: ClassLink Bearer token
+            oneroster_app_id: OneRoster application ID
 
         Returns:
             Dict with validation results
         """
-        logger.info("Starting ClassLink data quality validation")
+        logger.info("Starting ClassLink data validation", oneroster_app_id=oneroster_app_id)
 
         validation_results = {
             'success': True,
             'errors': [],
             'warnings': [],
-            'stats': {}
+            'stats': {},
+            'oneroster_app_id': oneroster_app_id
         }
 
         try:
+            # Get credentials first
+            creds = self.get_district_credentials(bearer_token, oneroster_app_id)
+            if not creds:
+                validation_results['success'] = False
+                validation_results['errors'].append('Failed to get district credentials')
+                return validation_results
+
+            validation_results['stats']['endpoint_url'] = creds['endpoint_url']
+
             # Check schools
-            schools = self.get_schools(api_key, limit=100)
+            schools = self.get_schools(bearer_token, oneroster_app_id, limit=100)
             validation_results['stats']['schools_count'] = len(schools)
 
             if len(schools) == 0:
-                validation_results['errors'].append('No schools found in ClassLink')
-                validation_results['success'] = False
+                validation_results['warnings'].append('No schools found for this district')
 
             # Check students
-            students = self.get_students(api_key, limit=100)
+            students = self.get_students(bearer_token, oneroster_app_id, limit=100)
             validation_results['stats']['students_count'] = len(students)
 
             if len(students) == 0:
-                validation_results['warnings'].append('No students found in ClassLink')
+                validation_results['warnings'].append('No students found for this district')
 
             # Validate student data quality
             students_missing_email = 0
             students_missing_name = 0
-            students_missing_grade = 0
 
             for student in students[:50]:  # Sample first 50
                 if not student.get('email'):
                     students_missing_email += 1
                 if not student.get('givenName') or not student.get('familyName'):
                     students_missing_name += 1
-                if not student.get('grade'):
-                    students_missing_grade += 1
 
             if students_missing_email > 0:
                 validation_results['warnings'].append(
@@ -413,51 +453,23 @@ class ClassLinkConnector:
                     f'{students_missing_name} students missing name fields (sample of 50)'
                 )
 
-            if students_missing_grade > 0:
-                validation_results['warnings'].append(
-                    f'{students_missing_grade} students missing grade level (sample of 50)'
-                )
-
-            # Check teachers
-            teachers = self.get_teachers(api_key, limit=100)
-            validation_results['stats']['teachers_count'] = len(teachers)
-
-            if len(teachers) == 0:
-                validation_results['warnings'].append('No teachers found in ClassLink')
-
             # Check classes
-            classes = self.get_classes(api_key, limit=100)
+            classes = self.get_classes(bearer_token, oneroster_app_id, limit=100)
             validation_results['stats']['classes_count'] = len(classes)
 
             if len(classes) == 0:
-                validation_results['warnings'].append('No classes found in ClassLink')
+                validation_results['warnings'].append('No classes found for this district')
 
-            # Check enrollments
-            enrollments = self.get_enrollments(api_key, limit=100)
-            validation_results['stats']['enrollments_count'] = len(enrollments)
-
-            if len(enrollments) == 0:
-                validation_results['warnings'].append('No enrollments found in ClassLink')
-
-            # Data consistency checks
-            if len(classes) > 0 and len(enrollments) == 0:
-                validation_results['errors'].append(
-                    'Classes exist but no enrollments found - data may be incomplete'
-                )
-                validation_results['success'] = False
-
-            if len(students) > 0 and len(enrollments) == 0:
-                validation_results['warnings'].append(
-                    'Students exist but no enrollments found - students may not be assigned to classes'
-                )
-
-            logger.info("ClassLink data quality validation completed",
+            logger.info("ClassLink data validation completed",
+                       oneroster_app_id=oneroster_app_id,
                        success=validation_results['success'],
                        errors=len(validation_results['errors']),
                        warnings=len(validation_results['warnings']))
 
         except Exception as e:
-            logger.error("Error during ClassLink data validation", error=str(e))
+            logger.error("Error during ClassLink data validation",
+                        oneroster_app_id=oneroster_app_id,
+                        error=str(e))
             validation_results['success'] = False
             validation_results['errors'].append(f'Validation failed: {str(e)}')
 

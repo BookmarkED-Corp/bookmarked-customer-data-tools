@@ -5,6 +5,7 @@ Routes for testing and saving database and API connections.
 """
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
 from src.connectors.bookmarked_db import BookmarkedDBConnector
+from src.connectors.bookmarked_api import BookmarkedAPIConnector
 from src.connectors.hubspot import HubSpotConnector
 from src.connectors.clickup import ClickUpConnector
 from src.connectors.classlink import ClassLinkConnector
@@ -55,6 +56,36 @@ def test_production():
         port=int(data.get('port', 5432)),
         database=data.get('database'),
         user=data.get('user'),
+        password=data.get('password')
+    )
+
+    return jsonify(result)
+
+
+@connections_bp.route('/api/connections/test/staging-api', methods=['POST'])
+def test_staging_api():
+    """Test staging API connection"""
+    data = request.json
+
+    connector = BookmarkedAPIConnector(environment='staging')
+    result = connector.test_connection(
+        base_url=data.get('base_url'),
+        username=data.get('username'),
+        password=data.get('password')
+    )
+
+    return jsonify(result)
+
+
+@connections_bp.route('/api/connections/test/production-api', methods=['POST'])
+def test_production_api():
+    """Test production API connection"""
+    data = request.json
+
+    connector = BookmarkedAPIConnector(environment='production')
+    result = connector.test_connection(
+        base_url=data.get('base_url'),
+        username=data.get('username'),
         password=data.get('password')
     )
 
@@ -122,26 +153,42 @@ def save_connections():
 
     connections = {}
 
-    # Staging database
+    # Staging (with nested db and api)
     if data.get('staging'):
+        staging = data['staging']
         connections['staging'] = {
-            'host': data['staging'].get('host'),
-            'port': int(data['staging'].get('port', 5432)),
-            'database': data['staging'].get('database'),
-            'user': data['staging'].get('user'),
-            'password': data['staging'].get('password'),
-            'enabled': data['staging'].get('enabled', True)
+            'db': {
+                'host': staging.get('db', {}).get('host'),
+                'port': int(staging.get('db', {}).get('port', 5432)),
+                'database': staging.get('db', {}).get('database'),
+                'user': staging.get('db', {}).get('user'),
+                'password': staging.get('db', {}).get('password')
+            },
+            'api': {
+                'base_url': staging.get('api', {}).get('base_url'),
+                'username': staging.get('api', {}).get('username'),
+                'password': staging.get('api', {}).get('password')
+            },
+            'enabled': staging.get('enabled', True)
         }
 
-    # Production database
+    # Production (with nested db and api)
     if data.get('production'):
+        production = data['production']
         connections['production'] = {
-            'host': data['production'].get('host'),
-            'port': int(data['production'].get('port', 5432)),
-            'database': data['production'].get('database'),
-            'user': data['production'].get('user'),
-            'password': data['production'].get('password'),
-            'enabled': data['production'].get('enabled', True)
+            'db': {
+                'host': production.get('db', {}).get('host'),
+                'port': int(production.get('db', {}).get('port', 5432)),
+                'database': production.get('db', {}).get('database'),
+                'user': production.get('db', {}).get('user'),
+                'password': production.get('db', {}).get('password')
+            },
+            'api': {
+                'base_url': production.get('api', {}).get('base_url'),
+                'username': production.get('api', {}).get('username'),
+                'password': production.get('api', {}).get('password')
+            },
+            'enabled': production.get('enabled', True)
         }
 
     # HubSpot
@@ -191,7 +238,17 @@ def load_connections():
         # Mask passwords in response
         safe_connections = {}
         for key, config in connections.items():
-            safe_config = config.copy()
+            import copy
+            safe_config = copy.deepcopy(config)
+
+            # Handle nested structure (staging/production with db and api)
+            if key in ['staging', 'production']:
+                if 'db' in safe_config and 'password' in safe_config['db']:
+                    safe_config['db']['password'] = '****' if safe_config['db']['password'] else ''
+                if 'api' in safe_config and 'password' in safe_config['api']:
+                    safe_config['api']['password'] = '****' if safe_config['api']['password'] else ''
+
+            # Handle flat structure (backward compatibility)
             if 'password' in safe_config:
                 safe_config['password'] = '****' if safe_config['password'] else ''
             if 'access_token' in safe_config:

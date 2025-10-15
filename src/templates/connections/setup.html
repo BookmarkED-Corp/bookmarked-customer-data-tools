@@ -202,6 +202,8 @@
                     Bookmarked Staging Database
                 </h2>
 
+                <h3 style="margin-bottom: 15px; color: #666; font-size: 16px;">Database Connection</h3>
+
                 <div class="grid-2col">
                     <div class="form-group">
                         <label for="staging-host">Host</label>
@@ -235,10 +237,38 @@
                 </div>
 
                 <div class="button-group">
-                    <button class="btn-test" onclick="testConnection('staging')">Test Connection</button>
+                    <button class="btn-test" onclick="testConnection('staging')">Test DB Connection</button>
                 </div>
 
                 <div class="status-message" id="staging-message"></div>
+
+                <hr style="margin: 25px 0; border: 1px solid #e0e0e0;">
+
+                <h3 style="margin-bottom: 15px; color: #666; font-size: 16px;">API Connection</h3>
+
+                <div class="form-group">
+                    <label for="staging-api-url">Base URL</label>
+                    <input type="text" id="staging-api-url" placeholder="https://stg.api.bookmarked.com">
+                    <div class="help-text">API base URL</div>
+                </div>
+
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label for="staging-api-username">API Username</label>
+                        <input type="text" id="staging-api-username" placeholder="api_user">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="staging-api-password">API Password</label>
+                        <input type="password" id="staging-api-password" placeholder="Enter API password">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('staging-api')">Test API Connection</button>
+                </div>
+
+                <div class="status-message" id="staging-api-message"></div>
             </div>
 
             <!-- Production Database -->
@@ -247,6 +277,8 @@
                     <span class="status-indicator" id="production-status"></span>
                     Bookmarked Production Database
                 </h2>
+
+                <h3 style="margin-bottom: 15px; color: #666; font-size: 16px;">Database Connection</h3>
 
                 <div class="grid-2col">
                     <div class="form-group">
@@ -279,10 +311,38 @@
                 </div>
 
                 <div class="button-group">
-                    <button class="btn-test" onclick="testConnection('production')">Test Connection</button>
+                    <button class="btn-test" onclick="testConnection('production')">Test DB Connection</button>
                 </div>
 
                 <div class="status-message" id="production-message"></div>
+
+                <hr style="margin: 25px 0; border: 1px solid #e0e0e0;">
+
+                <h3 style="margin-bottom: 15px; color: #666; font-size: 16px;">API Connection</h3>
+
+                <div class="form-group">
+                    <label for="production-api-url">Base URL</label>
+                    <input type="text" id="production-api-url" placeholder="https://prod.api.bookmarked.com">
+                    <div class="help-text">API base URL</div>
+                </div>
+
+                <div class="grid-2col">
+                    <div class="form-group">
+                        <label for="production-api-username">API Username</label>
+                        <input type="text" id="production-api-username" placeholder="api_user">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="production-api-password">API Password</label>
+                        <input type="password" id="production-api-password" placeholder="Enter API password">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="btn-test" onclick="testConnection('production-api')">Test API Connection</button>
+                </div>
+
+                <div class="status-message" id="production-api-message"></div>
             </div>
 
             <!-- HubSpot API -->
@@ -400,7 +460,7 @@
             button.textContent = 'Testing...';
 
             const messageEl = document.getElementById(`${type}-message`);
-            const statusEl = document.getElementById(`${type}-status`);
+            const statusEl = document.getElementById(getStatusIndicatorId(type));
 
             let data = {};
 
@@ -411,6 +471,13 @@
                     database: document.getElementById(`${type}-database`).value,
                     user: document.getElementById(`${type}-user`).value,
                     password: document.getElementById(`${type}-password`).value
+                };
+            } else if (type === 'staging-api' || type === 'production-api') {
+                const env = type.replace('-api', '');
+                data = {
+                    base_url: document.getElementById(`${env}-api-url`).value,
+                    username: document.getElementById(`${env}-api-username`).value,
+                    password: document.getElementById(`${env}-api-password`).value
                 };
             } else if (type === 'hubspot') {
                 data = {
@@ -445,6 +512,9 @@
                     }
                     statusEl.className = 'status-indicator success';
 
+                    // Save successful test
+                    markConnectionTested(type, true);
+
                     // Show validate button for ClassLink
                     if (type === 'classlink') {
                         document.getElementById('classlink-validate-btn').style.display = 'inline-block';
@@ -453,6 +523,9 @@
                     messageEl.className = 'status-message error';
                     messageEl.textContent = `✗ ${result.message}`;
                     statusEl.className = 'status-indicator error';
+
+                    // Mark as failed
+                    markConnectionTested(type, false);
                 }
             } catch (error) {
                 messageEl.className = 'status-message error';
@@ -524,19 +597,33 @@
         async function saveAllConnections() {
             const data = {
                 staging: {
-                    host: document.getElementById('staging-host').value,
-                    port: document.getElementById('staging-port').value,
-                    database: document.getElementById('staging-database').value,
-                    user: document.getElementById('staging-user').value,
-                    password: document.getElementById('staging-password').value,
+                    db: {
+                        host: document.getElementById('staging-host').value,
+                        port: document.getElementById('staging-port').value,
+                        database: document.getElementById('staging-database').value,
+                        user: document.getElementById('staging-user').value,
+                        password: document.getElementById('staging-password').value
+                    },
+                    api: {
+                        base_url: document.getElementById('staging-api-url').value,
+                        username: document.getElementById('staging-api-username').value,
+                        password: document.getElementById('staging-api-password').value
+                    },
                     enabled: true
                 },
                 production: {
-                    host: document.getElementById('production-host').value,
-                    port: document.getElementById('production-port').value,
-                    database: document.getElementById('production-database').value,
-                    user: document.getElementById('production-user').value,
-                    password: document.getElementById('production-password').value,
+                    db: {
+                        host: document.getElementById('production-host').value,
+                        port: document.getElementById('production-port').value,
+                        database: document.getElementById('production-database').value,
+                        user: document.getElementById('production-user').value,
+                        password: document.getElementById('production-password').value
+                    },
+                    api: {
+                        base_url: document.getElementById('production-api-url').value,
+                        username: document.getElementById('production-api-username').value,
+                        password: document.getElementById('production-api-password').value
+                    },
                     enabled: true
                 },
                 hubspot: {
@@ -575,6 +662,94 @@
             }
         }
 
+        // Track which connections have been tested successfully
+        const testedConnections = JSON.parse(localStorage.getItem('testedConnections') || '{}');
+
+        // Save successful test to localStorage
+        function markConnectionTested(type, success) {
+            const tested = JSON.parse(localStorage.getItem('testedConnections') || '{}');
+            tested[type] = success;
+            localStorage.setItem('testedConnections', JSON.stringify(tested));
+        }
+
+        // Helper function to get correct status indicator ID
+        function getStatusIndicatorId(type) {
+            // For API connections, use the parent environment's status indicator
+            if (type === 'staging-api') return 'staging-status';
+            if (type === 'production-api') return 'production-status';
+            return `${type}-status`;
+        }
+
+        // Auto-test previously successful connections
+        async function autoTestConnection(type) {
+            const messageEl = document.getElementById(`${type}-message`);
+            const statusEl = document.getElementById(getStatusIndicatorId(type));
+
+            messageEl.className = 'status-message';
+            messageEl.textContent = '⏳ Auto-testing connection...';
+            messageEl.style.display = 'block';
+
+            let data = {};
+
+            if (type === 'staging' || type === 'production') {
+                data = {
+                    host: document.getElementById(`${type}-host`).value,
+                    port: document.getElementById(`${type}-port`).value,
+                    database: document.getElementById(`${type}-database`).value,
+                    user: document.getElementById(`${type}-user`).value,
+                    password: document.getElementById(`${type}-password`).value
+                };
+            } else if (type === 'staging-api' || type === 'production-api') {
+                const env = type.replace('-api', '');
+                data = {
+                    base_url: document.getElementById(`${env}-api-url`).value,
+                    username: document.getElementById(`${env}-api-username`).value,
+                    password: document.getElementById(`${env}-api-password`).value
+                };
+            } else if (type === 'clickup') {
+                data = {
+                    api_key: document.getElementById('clickup-api-key').value
+                };
+            } else if (type === 'classlink') {
+                data = {
+                    api_key: document.getElementById('classlink-api-key').value
+                };
+            }
+
+            try {
+                const response = await fetch(`/api/connections/test/${type}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    messageEl.className = 'status-message success';
+                    messageEl.textContent = `✓ ${result.message} (auto-tested)`;
+                    statusEl.className = 'status-indicator success';
+                    markConnectionTested(type, true);
+
+                    if (type === 'classlink') {
+                        document.getElementById('classlink-validate-btn').style.display = 'inline-block';
+                    }
+                } else {
+                    messageEl.className = 'status-message error';
+                    messageEl.textContent = `✗ ${result.message} (auto-test failed)`;
+                    statusEl.className = 'status-indicator error';
+                    markConnectionTested(type, false);
+                }
+            } catch (error) {
+                messageEl.className = 'status-message error';
+                messageEl.textContent = `✗ Auto-test failed: ${error.message}`;
+                statusEl.className = 'status-indicator error';
+                markConnectionTested(type, false);
+            }
+        }
+
         // Load existing connections on page load
         window.addEventListener('DOMContentLoaded', async () => {
             try {
@@ -587,20 +762,36 @@
 
                     // Load staging defaults
                     if (defaults.staging) {
-                        document.getElementById('staging-host').value = defaults.staging.host || '';
-                        document.getElementById('staging-port').value = defaults.staging.port || 5432;
-                        document.getElementById('staging-database').value = defaults.staging.database || '';
-                        document.getElementById('staging-user').value = defaults.staging.user || '';
-                        document.getElementById('staging-password').value = defaults.staging.password || '';
+                        // Handle nested structure (db section)
+                        const stagingDb = defaults.staging.db || defaults.staging;
+                        document.getElementById('staging-host').value = stagingDb.host || '';
+                        document.getElementById('staging-port').value = stagingDb.port || 5432;
+                        document.getElementById('staging-database').value = stagingDb.database || '';
+                        document.getElementById('staging-user').value = stagingDb.user || '';
+                        document.getElementById('staging-password').value = stagingDb.password || '';
+
+                        // Handle API section
+                        const stagingApi = defaults.staging.api || {};
+                        document.getElementById('staging-api-url').value = stagingApi.base_url || '';
+                        document.getElementById('staging-api-username').value = stagingApi.username || '';
+                        document.getElementById('staging-api-password').value = stagingApi.password || '';
                     }
 
                     // Load production defaults
                     if (defaults.production) {
-                        document.getElementById('production-host').value = defaults.production.host || '';
-                        document.getElementById('production-port').value = defaults.production.port || 5432;
-                        document.getElementById('production-database').value = defaults.production.database || '';
-                        document.getElementById('production-user').value = defaults.production.user || '';
-                        document.getElementById('production-password').value = defaults.production.password || '';
+                        // Handle nested structure (db section)
+                        const productionDb = defaults.production.db || defaults.production;
+                        document.getElementById('production-host').value = productionDb.host || '';
+                        document.getElementById('production-port').value = productionDb.port || 5432;
+                        document.getElementById('production-database').value = productionDb.database || '';
+                        document.getElementById('production-user').value = productionDb.user || '';
+                        document.getElementById('production-password').value = productionDb.password || '';
+
+                        // Handle API section
+                        const productionApi = defaults.production.api || {};
+                        document.getElementById('production-api-url').value = productionApi.base_url || '';
+                        document.getElementById('production-api-username').value = productionApi.username || '';
+                        document.getElementById('production-api-password').value = productionApi.password || '';
                     }
 
                     // Load HubSpot defaults
@@ -628,14 +819,25 @@
 
                     // Load staging (override defaults)
                     if (conn.staging) {
-                        document.getElementById('staging-host').value = conn.staging.host || '';
-                        document.getElementById('staging-port').value = conn.staging.port || 5432;
-                        document.getElementById('staging-database').value = conn.staging.database || '';
-                        document.getElementById('staging-user').value = conn.staging.user || '';
+                        // Handle nested structure (db section)
+                        const stagingDb = conn.staging.db || conn.staging;
+                        document.getElementById('staging-host').value = stagingDb.host || '';
+                        document.getElementById('staging-port').value = stagingDb.port || 5432;
+                        document.getElementById('staging-database').value = stagingDb.database || '';
+                        document.getElementById('staging-user').value = stagingDb.user || '';
                         // Don't override password if it's masked
-                        if (conn.staging.password && conn.staging.password !== '****') {
-                            document.getElementById('staging-password').value = conn.staging.password;
+                        if (stagingDb.password && stagingDb.password !== '****') {
+                            document.getElementById('staging-password').value = stagingDb.password;
                         }
+
+                        // Handle API section
+                        const stagingApi = conn.staging.api || {};
+                        document.getElementById('staging-api-url').value = stagingApi.base_url || '';
+                        document.getElementById('staging-api-username').value = stagingApi.username || '';
+                        if (stagingApi.password && stagingApi.password !== '****') {
+                            document.getElementById('staging-api-password').value = stagingApi.password;
+                        }
+
                         if (conn.staging.enabled) {
                             document.getElementById('staging-status').className = 'status-indicator success';
                         }
@@ -643,14 +845,25 @@
 
                     // Load production (override defaults)
                     if (conn.production) {
-                        document.getElementById('production-host').value = conn.production.host || '';
-                        document.getElementById('production-port').value = conn.production.port || 5432;
-                        document.getElementById('production-database').value = conn.production.database || '';
-                        document.getElementById('production-user').value = conn.production.user || '';
+                        // Handle nested structure (db section)
+                        const productionDb = conn.production.db || conn.production;
+                        document.getElementById('production-host').value = productionDb.host || '';
+                        document.getElementById('production-port').value = productionDb.port || 5432;
+                        document.getElementById('production-database').value = productionDb.database || '';
+                        document.getElementById('production-user').value = productionDb.user || '';
                         // Don't override password if it's masked
-                        if (conn.production.password && conn.production.password !== '****') {
-                            document.getElementById('production-password').value = conn.production.password;
+                        if (productionDb.password && productionDb.password !== '****') {
+                            document.getElementById('production-password').value = productionDb.password;
                         }
+
+                        // Handle API section
+                        const productionApi = conn.production.api || {};
+                        document.getElementById('production-api-url').value = productionApi.base_url || '';
+                        document.getElementById('production-api-username').value = productionApi.username || '';
+                        if (productionApi.password && productionApi.password !== '****') {
+                            document.getElementById('production-api-password').value = productionApi.password;
+                        }
+
                         if (conn.production.enabled) {
                             document.getElementById('production-status').className = 'status-indicator success';
                         }
@@ -687,6 +900,24 @@
                         }
                     }
                 }
+
+                // Auto-test previously successful connections
+                const tested = JSON.parse(localStorage.getItem('testedConnections') || '{}');
+                const connectionsToTest = [
+                    'staging', 'staging-api',
+                    'production', 'production-api',
+                    'clickup', 'classlink'
+                ];
+
+                // Only auto-test connections that previously passed
+                for (const connType of connectionsToTest) {
+                    if (tested[connType] === true) {
+                        // Add small delay between tests to avoid overwhelming the server
+                        await new Promise(resolve => setTimeout(resolve, 500));
+                        await autoTestConnection(connType);
+                    }
+                }
+
             } catch (error) {
                 console.error('Error loading connections:', error);
             }

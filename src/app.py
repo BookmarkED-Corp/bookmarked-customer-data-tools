@@ -114,17 +114,26 @@ def create_app(config_name='development'):
                 <div class="status">✅ Application Running</div>
 
                 <div class="info">
+                    <h3>🔍 Diagnostic Tools Available</h3>
+                    <p style="font-size: 1.1em; margin-bottom: 20px;">
+                        <strong>Student Search & Comparison Tool</strong> - Search for students across environments
+                        and compare ClassLink/OneRoster data with Bookmarked database.
+                    </p>
+                    <a href="/district-select" style="
+                        display: inline-block;
+                        background: #15b79e;
+                        color: white;
+                        padding: 12px 24px;
+                        border-radius: 6px;
+                        text-decoration: none;
+                        font-weight: 600;
+                        margin-bottom: 20px;
+                    ">Launch Student Search Tool →</a>
+                </div>
+
+                <div class="info">
                     <h3>Project Status: Setup Complete</h3>
                     <p>The Customer Data Tools platform is initialized and ready for Phase 1 development.</p>
-
-                    <h4>Next Steps (Phase 1 - Oct 14-17):</h4>
-                    <ul>
-                        <li>TASK-001: Complete Flask application setup</li>
-                        <li>TASK-002: Implement authentication system</li>
-                        <li>TASK-003: Build Bookmarked staging DB connector</li>
-                        <li>TASK-004: Build Bookmarked production DB connector</li>
-                        <li>TASK-005: Create customer integration settings loader</li>
-                    </ul>
 
                     <h4>Target Launch:</h4>
                     <p><strong>October 31, 2025</strong> (17 days)</p>
@@ -132,6 +141,7 @@ def create_app(config_name='development'):
                     <h4>Quick Links:</h4>
                     <ul>
                         <li><a href="/connections/setup" style="color: #ff6227; font-weight: 600;">🔌 Connection Setup</a> - Configure database and API connections</li>
+                        <li><a href="/tools" style="color: #15b79e; font-weight: 600;">🔧 Diagnostic Tools</a> - Student search, data comparison, and quality reports</li>
                         <li><a href="/docs/EXECUTIVE_SUMMARY.html" target="_blank">Executive Summary</a></li>
                         <li><a href="http://localhost:9001/kanban_ui.html" target="_blank">Kanban Board</a></li>
                     </ul>

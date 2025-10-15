@@ -13,6 +13,12 @@ logger = structlog.get_logger(__name__)
 tools_bp = Blueprint('tools', __name__)
 
 
+@tools_bp.route('/tools')
+def tools_dashboard():
+    """Display main tools dashboard with district picker"""
+    return render_template('tools.html')
+
+
 @tools_bp.route('/district-select')
 def district_select():
     """Display district selection page"""

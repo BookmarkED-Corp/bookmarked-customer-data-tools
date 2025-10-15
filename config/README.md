@@ -11,18 +11,32 @@ Machine-specific default connection values. Each developer can have different de
 ```json
 {
   "staging": {
-    "host": "database-hostname",
-    "port": 5432,
-    "database": "database-name",
-    "user": "username",
-    "password": "password"
+    "db": {
+      "host": "database-hostname",
+      "port": 5432,
+      "database": "database-name",
+      "user": "username",
+      "password": "password"
+    },
+    "api": {
+      "base_url": "https://stg.api.bookmarked.com",
+      "username": "api-username",
+      "password": "api-password"
+    }
   },
   "production": {
-    "host": "",
-    "port": 5432,
-    "database": "",
-    "user": "",
-    "password": ""
+    "db": {
+      "host": "",
+      "port": 5432,
+      "database": "",
+      "user": "",
+      "password": ""
+    },
+    "api": {
+      "base_url": "https://prod.api.bookmarked.com",
+      "username": "",
+      "password": ""
+    }
   },
   "hubspot": {
     "access_token": ""

@@ -1,17 +1,31 @@
 {
   "staging": {
-    "host": "",
-    "port": 5432,
-    "database": "",
-    "user": "",
-    "password": ""
+    "db": {
+      "host": "",
+      "port": 5432,
+      "database": "",
+      "user": "",
+      "password": ""
+    },
+    "api": {
+      "base_url": "https://stg.api.bookmarked.com",
+      "username": "",
+      "password": ""
+    }
   },
   "production": {
-    "host": "",
-    "port": 5432,
-    "database": "",
-    "user": "",
-    "password": ""
+    "db": {
+      "host": "",
+      "port": 5432,
+      "database": "",
+      "user": "",
+      "password": ""
+    },
+    "api": {
+      "base_url": "https://prod.api.bookmarked.com",
+      "username": "",
+      "password": ""
+    }
   },
   "hubspot": {
     "access_token": ""
