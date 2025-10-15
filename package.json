@@ -5,7 +5,10 @@
   "main": "kanban_server.js",
   "scripts": {
     "start": "node kanban_server.js",
-    "kanban": "node kanban_server.js"
+    "kanban": "node kanban_server.js",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
   },
   "keywords": [
     "customer-support",
@@ -17,6 +20,9 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.9.1",
     "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
   },
   "engines": {
     "node": ">=14.0.0"
