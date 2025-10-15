@@ -32,6 +32,12 @@ def student_search():
     return render_template('student_search.html')
 
 
+@tools_bp.route('/tools/parent-search')
+def parent_search():
+    """Display parent search/compare tool"""
+    return render_template('parent_search.html')
+
+
 @tools_bp.route('/api/districts')
 def get_districts():
     """
@@ -416,6 +422,396 @@ def get_student_details(student_id):
     except Exception as e:
         logger.error("Error fetching student details",
                     student_id=student_id,
+                    error=str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+def get_environment_config(environment):
+    """Helper function to load environment configuration"""
+    from src.utils.connections import ConnectionsConfig
+    config_manager = ConnectionsConfig()
+    defaults = config_manager.load_defaults()
+
+    if not defaults or environment not in defaults:
+        return None
+
+    return defaults[environment]
+
+
+@tools_bp.route('/api/districts/<int:district_id>/classlink-sync', methods=['GET'])
+def get_district_classlink_sync(district_id):
+    """
+    Get ClassLink sync status for a district from Bookmarked API
+
+    Query params:
+        environment: 'staging' or 'production'
+    """
+    try:
+        environment = request.args.get('environment', 'staging')
+
+        logger.info("Fetching ClassLink sync status for district",
+                   district_id=district_id,
+                   environment=environment)
+
+        # Get environment configuration
+        env_config = get_environment_config(environment)
+        if not env_config:
+            return jsonify({
+                'success': False,
+                'message': f'No configuration found for environment: {environment}'
+            }), 404
+
+        # Check if API credentials are configured
+        if 'api' not in env_config:
+            logger.info("No API configuration for district",
+                       district_id=district_id,
+                       environment=environment)
+            return jsonify({
+                'success': False,
+                'message': 'No API configuration found for this environment'
+            }), 404
+
+        # Connect to Bookmarked API
+        from src.connectors.bookmarked_api import BookmarkedAPIConnector
+
+        api = BookmarkedAPIConnector(environment=environment)
+        api_config = env_config['api']
+
+        connected = api.connect(
+            base_url=api_config.get('base_url'),
+            username=api_config.get('username'),
+            password=api_config.get('password')
+        )
+
+        if not connected:
+            logger.error("Failed to connect to Bookmarked API",
+                        environment=environment)
+            return jsonify({
+                'success': False,
+                'message': 'Failed to connect to Bookmarked API'
+            }), 500
+
+        # Get ClassLink sync status
+        sync_status = api.get_classlink_sync_status(district_id)
+
+        api.disconnect()
+
+        if sync_status:
+            logger.info("ClassLink sync status retrieved successfully",
+                       district_id=district_id)
+            return jsonify({
+                'success': True,
+                'sync_status': sync_status
+            })
+        else:
+            logger.info("No ClassLink sync status available",
+                       district_id=district_id)
+            return jsonify({
+                'success': False,
+                'message': 'No ClassLink sync status available for this district'
+            }), 404
+
+    except Exception as e:
+        logger.error("Error fetching ClassLink sync status",
+                    district_id=district_id,
+                    error=str(e),
+                    exc_info=True)
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
+
+@tools_bp.route('/api/parents/search', methods=['POST'])
+def search_parent():
+    """
+    Search for parent in Bookmarked database
+
+    Request body:
+        search_term: Parent name or email
+        district_id: Selected district ID
+        environment: 'staging' or 'production'
+    """
+    data = request.json
+    search_term = data.get('search_term')
+    district_id = data.get('district_id')
+    environment = data.get('environment', 'staging')
+
+    if not search_term or not district_id:
+        return jsonify({
+            'success': False,
+            'message': 'Missing search_term or district_id'
+        }), 400
+
+    try:
+        # Load configuration
+        from src.utils.connections import ConnectionsConfig
+        config_manager = ConnectionsConfig()
+        defaults = config_manager.load_defaults()
+
+        if not defaults or environment not in defaults:
+            return jsonify({
+                'success': False,
+                'message': f'No {environment} configuration found'
+            }), 400
+
+        env_config = defaults[environment]
+
+        # Connect to database
+        db = BookmarkedDBConnector(environment=environment)
+
+        # Handle nested structure
+        if 'db' in env_config:
+            db_config = env_config['db']
+        else:
+            db_config = env_config
+
+        connected = db.connect(
+            host=db_config.get('host'),
+            port=db_config.get('port', 5432),
+            database=db_config.get('database'),
+            user=db_config.get('user'),
+            password=db_config.get('password')
+        )
+
+        if not connected:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to connect to database'
+            }), 500
+
+        # Query parent from Bookmarked DB
+        # Search by email, name, or phone
+        parent_query = """
+            SELECT DISTINCT
+                p.id,
+                p."sourcedId",
+                p."givenName",
+                p."familyName",
+                p.email,
+                p.phone,
+                p."createdAt",
+                p."updatedAt"
+            FROM "Parent" p
+            LEFT JOIN "_ParentToStudent" ps ON p.id = ps."A"
+            LEFT JOIN "Student" s ON ps."B" = s.id
+            LEFT JOIN "_CampusToStudent" cs ON s.id = cs."B"
+            LEFT JOIN "Campus" c ON cs."A" = c.id
+            WHERE c."districtId" = :district_id
+                AND (
+                    p.email ILIKE :search_term
+                    OR p."givenName" ILIKE :search_term
+                    OR p."familyName" ILIKE :search_term
+                    OR p.phone ILIKE :search_term
+                    OR CONCAT(p."givenName", ' ', p."familyName") ILIKE :search_term
+                )
+            ORDER BY p."familyName", p."givenName"
+            LIMIT 50
+        """
+
+        parent_results = db.execute_query(parent_query, {
+            'district_id': district_id,
+            'search_term': f'%{search_term}%'
+        })
+
+        # If multiple parents found, return list for user to choose
+        if len(parent_results) > 1:
+            logger.info("Multiple parents found", count=len(parent_results))
+
+            # Enrich each parent with child count
+            for parent in parent_results:
+                try:
+                    child_count_query = """
+                        SELECT COUNT(*) as count
+                        FROM "_ParentToStudent" ps
+                        WHERE ps."A" = :parent_id
+                    """
+                    count_result = db.execute_query(child_count_query, {
+                        'parent_id': parent['id']
+                    })
+                    parent['child_count'] = count_result[0]['count'] if count_result else 0
+                except Exception as e:
+                    logger.warning("Failed to get child count", error=str(e))
+                    parent['child_count'] = 0
+
+            db.disconnect()
+            return jsonify({
+                'success': True,
+                'multiple_matches': True,
+                'count': len(parent_results),
+                'parents': parent_results
+            })
+
+        parent_data = parent_results[0] if parent_results else None
+
+        if not parent_data:
+            db.disconnect()
+            return jsonify({
+                'success': False,
+                'message': 'No parent found in Bookmarked database',
+                'parent': False
+            }), 404
+
+        # Get all children for this parent
+        children_query = """
+            SELECT
+                s.id,
+                s."sourcedId",
+                s."givenName",
+                s."familyName",
+                s.email,
+                s.grade
+            FROM "_ParentToStudent" ps
+            JOIN "Student" s ON ps."B" = s.id
+            WHERE ps."A" = :parent_id
+            ORDER BY s.grade DESC, s."familyName", s."givenName"
+        """
+        children = db.execute_query(children_query, {
+            'parent_id': parent_data['id']
+        })
+        parent_data['children'] = children
+        logger.info("Children retrieved for parent", count=len(children))
+
+        db.disconnect()
+
+        # Convert date objects to strings
+        for key in ['createdAt', 'updatedAt']:
+            if key in parent_data and parent_data[key]:
+                parent_data[key] = str(parent_data[key])
+
+        return jsonify({
+            'success': True,
+            'parent': True,
+            'bookmarked_data': parent_data
+        })
+
+    except Exception as e:
+        logger.error("Error searching parent",
+                    search_term=search_term,
+                    district_id=district_id,
+                    error=str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@tools_bp.route('/api/parents/<int:parent_id>', methods=['GET'])
+def get_parent_details(parent_id):
+    """
+    Get detailed information for a specific parent by ID
+
+    Query params:
+        district_id: District ID
+        environment: 'staging' or 'production'
+    """
+    district_id = request.args.get('district_id', type=int)
+    environment = request.args.get('environment', 'staging')
+
+    if not district_id:
+        return jsonify({
+            'success': False,
+            'message': 'Missing district_id'
+        }), 400
+
+    try:
+        # Load configuration
+        from src.utils.connections import ConnectionsConfig
+        config_manager = ConnectionsConfig()
+        defaults = config_manager.load_defaults()
+
+        if not defaults or environment not in defaults:
+            return jsonify({
+                'success': False,
+                'message': f'No {environment} configuration found'
+            }), 400
+
+        env_config = defaults[environment]
+
+        # Connect to database
+        db = BookmarkedDBConnector(environment=environment)
+
+        if 'db' in env_config:
+            db_config = env_config['db']
+        else:
+            db_config = env_config
+
+        connected = db.connect(
+            host=db_config.get('host'),
+            port=db_config.get('port', 5432),
+            database=db_config.get('database'),
+            user=db_config.get('user'),
+            password=db_config.get('password')
+        )
+
+        if not connected:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to connect to database'
+            }), 500
+
+        # Get parent by ID
+        parent_query = """
+            SELECT
+                p.id,
+                p."sourcedId",
+                p."givenName",
+                p."familyName",
+                p.email,
+                p.phone,
+                p."createdAt",
+                p."updatedAt"
+            FROM "Parent" p
+            WHERE p.id = :parent_id
+        """
+
+        parents = db.execute_query(parent_query, {'parent_id': parent_id})
+
+        if not parents:
+            db.disconnect()
+            return jsonify({
+                'success': False,
+                'message': 'Parent not found'
+            }), 404
+
+        parent_data = parents[0]
+
+        # Get all children for this parent
+        children_query = """
+            SELECT
+                s.id,
+                s."sourcedId",
+                s."givenName",
+                s."familyName",
+                s.email,
+                s.grade
+            FROM "_ParentToStudent" ps
+            JOIN "Student" s ON ps."B" = s.id
+            WHERE ps."A" = :parent_id
+            ORDER BY s.grade DESC, s."familyName", s."givenName"
+        """
+        children = db.execute_query(children_query, {'parent_id': parent_id})
+        parent_data['children'] = children
+
+        # Convert dates
+        for key in ['createdAt', 'updatedAt']:
+            if key in parent_data and parent_data[key]:
+                parent_data[key] = str(parent_data[key])
+
+        db.disconnect()
+
+        return jsonify({
+            'success': True,
+            'parent': True,
+            'bookmarked_data': parent_data
+        })
+
+    except Exception as e:
+        logger.error("Error fetching parent details",
+                    parent_id=parent_id,
                     error=str(e))
         return jsonify({
             'success': False,

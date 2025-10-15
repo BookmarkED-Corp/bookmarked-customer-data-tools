@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Search - Customer Data Tools</title>
+    <title>Parent Search - Customer Data Tools</title>
     <style>
         * {
             margin: 0;
@@ -339,7 +339,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔍 Find Student</h1>
+            <h1>🔍 Find Parent</h1>
             <nav>
                 <a href="/tools">← Back to Tools</a>
                 <a href="/connections/setup">⚙ Settings</a>
@@ -356,11 +356,11 @@
 
             <!-- Search Form -->
             <div class="search-section">
-                <h2>Search Student</h2>
+                <h2>Search Parent</h2>
                 <div class="search-form">
                     <div class="form-group">
-                        <label for="search-term">Student ID, Name, or Email</label>
-                        <input type="text" id="search-term" placeholder="Enter student ID, name, or email...">
+                        <label for="search-term">Parent Name or Email</label>
+                        <input type="text" id="search-term" placeholder="Enter parent name or email...">
                     </div>
                     <button class="btn-search" onclick="searchStudent()">Search</button>
                 </div>
@@ -368,18 +368,18 @@
 
             <!-- Loading -->
             <div id="loading" class="loading" style="display:none;">
-                Searching for student in both systems...
+                Searching for parent in both systems...
             </div>
 
             <!-- No Results -->
             <div id="no-results" class="no-results" style="display:none;">
-                No student found matching your search criteria.
+                No parent found matching your search criteria.
             </div>
 
             <!-- Multiple Matches Selection -->
             <div id="multiple-matches" class="search-section" style="display:none;">
-                <h3>Multiple Students Found (<span id="match-count">0</span>)</h3>
-                <p style="color: #666; margin-bottom: 15px;">Please select the correct student from the list below:</p>
+                <h3>Multiple Parents Found (<span id="match-count">0</span>)</h3>
+                <p style="color: #666; margin-bottom: 15px;">Please select the correct parent from the list below:</p>
                 <div id="student-list" style="max-height: 400px; overflow-y: auto;"></div>
             </div>
 
@@ -625,10 +625,10 @@
                 environment: selectedEnvironment
             };
 
-            addLog('Sending API request to /api/students/search', requestBody);
+            addLog('Sending API request to /api/parents/search', requestBody);
 
             try {
-                const response = await fetch(`/api/students/search`, {
+                const response = await fetch(`/api/parents/search`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -649,21 +649,21 @@
                 document.getElementById('loading').style.display = 'none';
 
                 if (result.success && result.multiple_matches) {
-                    // Multiple students found - show selection list
-                    addLog(`Multiple students found: ${result.count}`, null, 'info');
-                    displayStudentSelection(result.students);
-                } else if (result.success && result.student) {
-                    addLog('Student found, displaying comparison', null, 'success');
+                    // Multiple parents found - show selection list
+                    addLog(`Multiple parents found: ${result.count}`, null, 'info');
+                    displayStudentSelection(result.parents);
+                } else if (result.success && result.parent) {
+                    addLog('Parent found, displaying comparison', null, 'success');
                     currentResults = result;
                     displayComparison(result);
                 } else {
-                    addLog('No student found', { message: result.message || 'No match' }, 'error');
+                    addLog('No parent found', { message: result.message || 'No match' }, 'error');
                     document.getElementById('no-results').style.display = 'block';
                 }
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 addLog('API request failed with exception', { error: error.message, stack: error.stack }, 'error');
-                alert('Error searching student: ' + error.message);
+                alert('Error searching parent: ' + error.message);
             }
         }
 
@@ -696,8 +696,8 @@
             }
         }
 
-        // Display student selection list
-        function displayStudentSelection(students) {
+        // Display parent selection list
+        function displayStudentSelection(parents) {
             const studentList = document.getElementById('student-list');
             const matchCount = document.getElementById('match-count');
 
@@ -708,40 +708,44 @@
 
             // Show multiple matches section
             document.getElementById('multiple-matches').style.display = 'block';
-            matchCount.textContent = students.length;
+            matchCount.textContent = parents.length;
 
-            // Build student list
+            // Build parent list
             let html = '';
-            students.forEach(student => {
-                const name = `${student.givenName || ''} ${student.familyName || ''}`.trim() || 'Unknown';
-                const email = student.email || 'No email';
-                const grade = student.grade || 'N/A';
-                const sourcedId = student.sourcedId || 'No ID';
-                const isDeleted = student.isDeleted ? ' (DELETED)' : '';
+            parents.forEach(parent => {
+                const name = `${parent.givenName || ''} ${parent.familyName || ''}`.trim() || 'Unknown';
+                const email = parent.email || 'No email';
+                const phone = parent.phone || 'No phone';
+                const sourcedId = parent.sourcedId || 'No ID';
 
-                // Data freshness indicator
-                const lastUpdated = formatRelativeTime(student.updatedAt);
-                const freshnessColor = getFreshnessColor(student.updatedAt);
+                // Account status
+                const accountStatus = parent.accountStatus || 'Unknown';
+                let statusColor = '#999';
+                if (accountStatus === 'ACTIVE' || accountStatus.includes('VERIFIED')) {
+                    statusColor = '#15b79e';
+                } else if (accountStatus === 'INVITATION_NOT_SENT') {
+                    statusColor = '#ff6227';
+                } else if (accountStatus.includes('PENDING') || accountStatus.includes('SENT')) {
+                    statusColor = '#ffa726';
+                }
 
-                // Enrollment count
-                const enrollmentCount = student.enrollment_count || 0;
-                const hasEnrollments = enrollmentCount > 0;
+                // Time indicators
+                const inviteSent = parent.inviteSentDate ? formatRelativeTime(parent.inviteSentDate) : 'Not sent';
+                const lastLogin = parent.lastLoginDate ? formatRelativeTime(parent.lastLoginDate) : 'Never';
 
                 html += `
-                    <div class="student-item" onclick="selectStudent(${student.id})">
+                    <div class="student-item" onclick="selectStudent(${parent.id})">
                         <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                            <h4 style="margin: 0;">${name}${isDeleted}</h4>
-                            <span style="background: ${freshnessColor}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
-                                Updated ${lastUpdated}
+                            <h4 style="margin: 0;">${name}</h4>
+                            <span style="background: ${statusColor}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                ${accountStatus.replace(/_/g, ' ')}
                             </span>
                         </div>
                         <div class="student-details">
                             <span><strong>ID:</strong> ${sourcedId}</span>
-                            <span><strong>Grade:</strong> ${grade}</span>
                             <span><strong>Email:</strong> ${email}</span>
-                            <span style="color: ${hasEnrollments ? '#15b79e' : '#999'};">
-                                <strong>📚 Classes:</strong> ${enrollmentCount}
-                            </span>
+                            <span><strong>Phone:</strong> ${phone}</span>
+                            <span><strong>Last Login:</strong> ${lastLogin}</span>
                         </div>
                     </div>
                 `;
@@ -749,7 +753,7 @@
 
             studentList.innerHTML = html;
 
-            addLog('Student selection list displayed', { count: students.length }, 'success');
+            addLog('Parent selection list displayed', { count: parents.length }, 'success');
         }
 
         // Get color based on data freshness
@@ -769,9 +773,9 @@
             }
         }
 
-        // Select a student from the list
-        async function selectStudent(studentId) {
-            addLog('Student selected', { studentId });
+        // Select a parent from the list
+        async function selectStudent(parentId) {
+            addLog('Parent selected', { parentId });
 
             // Hide selection list
             document.getElementById('multiple-matches').style.display = 'none';
@@ -779,26 +783,26 @@
 
             try {
                 const response = await fetch(
-                    `/api/students/${studentId}?district_id=${selectedDistrictId}&environment=${selectedEnvironment}`
+                    `/api/parents/${parentId}?district_id=${selectedDistrictId}&environment=${selectedEnvironment}`
                 );
 
                 const result = await response.json();
 
-                addLog('Received student details', result, response.ok ? 'success' : 'error');
+                addLog('Received parent details', result, response.ok ? 'success' : 'error');
 
                 document.getElementById('loading').style.display = 'none';
 
-                if (result.success && result.student) {
+                if (result.success && result.parent) {
                     currentResults = result;
                     displayComparison(result);
                 } else {
-                    addLog('Failed to fetch student details', { message: result.message }, 'error');
-                    alert('Failed to fetch student details: ' + (result.message || 'Unknown error'));
+                    addLog('Failed to fetch parent details', { message: result.message }, 'error');
+                    alert('Failed to fetch parent details: ' + (result.message || 'Unknown error'));
                 }
             } catch (error) {
                 document.getElementById('loading').style.display = 'none';
                 addLog('API request failed', { error: error.message }, 'error');
-                alert('Error fetching student details: ' + error.message);
+                alert('Error fetching parent details: ' + error.message);
             }
         }
 
@@ -917,38 +921,27 @@
 
             let html = '';
 
-            // Show DELETED warning banner at the top if student is deleted
-            if (data.isDeleted === true || data.isDeleted === 'true') {
-                html += `
-                    <div class="field-row" style="background: #ff4444; border: 3px solid #cc0000; margin-bottom: 15px;">
-                        <span class="field-label" style="font-size: 16px; color: white; font-weight: 700;">⚠️ STUDENT DELETED</span>
-                        <span class="field-value" style="color: white; font-weight: 700;">This student record has been marked as deleted</span>
-                    </div>
-                `;
-            }
+            // Show account status banner at the top
+            if (data.accountStatus) {
+                const accountStatus = data.accountStatus;
+                let statusColor = '#999';
+                let statusBg = '#f0f0f0';
 
-            // Show operational stats at the top if we have enriched data
-            if (enrichedData) {
-                const restrictedBooks = enrichedData.numberOfBooksRestricted || 0;
-                const checkouts = enrichedData.checkoutCounts || 0;
-                const restrictedColor = restrictedBooks > 0 ? '#ff6227' : '#15b79e';
+                if (accountStatus === 'ACTIVE' || accountStatus.includes('VERIFIED')) {
+                    statusColor = '#15b79e';
+                    statusBg = '#d4edda';
+                } else if (accountStatus === 'INVITATION_NOT_SENT') {
+                    statusColor = '#ff6227';
+                    statusBg = '#f8d7da';
+                } else if (accountStatus.includes('PENDING') || accountStatus.includes('SENT')) {
+                    statusColor = '#ffa726';
+                    statusBg = '#fff3cd';
+                }
 
                 html += `
-                    <div class="field-row" style="background: #f0f8ff; border: 2px solid #183162; margin-bottom: 15px;">
-                        <span class="field-label" style="font-size: 14px; color: #183162;"><strong>📊 Account Status</strong></span>
-                        <span class="field-value"></span>
-                    </div>
-                    <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                        <span class="field-label">Restricted Books:</span>
-                        <span class="field-value" style="color: ${restrictedColor}; font-weight: 600;">
-                            ${restrictedBooks}
-                        </span>
-                    </div>
-                    <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                        <span class="field-label">Total Checkouts:</span>
-                        <span class="field-value" style="color: #183162; font-weight: 600;">
-                            ${checkouts}
-                        </span>
+                    <div class="field-row" style="background: ${statusBg}; border: 3px solid ${statusColor}; margin-bottom: 15px;">
+                        <span class="field-label" style="font-size: 16px; color: ${statusColor}; font-weight: 700;">📊 Account Status</span>
+                        <span class="field-value" style="color: ${statusColor}; font-weight: 700;">${accountStatus.replace(/_/g, ' ')}</span>
                     </div>
                 `;
             }
@@ -958,8 +951,10 @@
                 { key: 'givenName', label: 'First Name' },
                 { key: 'familyName', label: 'Last Name' },
                 { key: 'email', label: 'Email' },
-                { key: 'grade', label: 'Grade' },
-                { key: 'isDeleted', label: 'Is Deleted' },
+                { key: 'phone', label: 'Phone' },
+                { key: 'inviteSentDate', label: 'Invite Sent', isDate: true },
+                { key: 'inviteAcceptedDate', label: 'Invite Accepted', isDate: true },
+                { key: 'lastLoginDate', label: 'Last Login', isDate: true },
                 { key: 'createdAt', label: 'Created', isDate: true },
                 { key: 'updatedAt', label: 'Updated', isDate: true }
             ];
@@ -992,15 +987,8 @@
                     displayValue = value || '<em>Not found</em>';
                 }
 
-                // Special styling for isDeleted field when true
-                let rowStyle = '';
-                if (field.key === 'isDeleted' && (value === true || value === 'true')) {
-                    rowStyle = 'background: #ffcccc; border-left: 4px solid #ff4444;';
-                    displayValue = '<strong style="color: #cc0000; font-size: 14px;">YES - DELETED</strong>';
-                }
-
                 html += `
-                    <div class="field-row" style="${rowStyle}">
+                    <div class="field-row">
                         <span class="field-label">${field.label}:</span>
                         <span class="field-value ${className}">
                             ${displayValue}
@@ -1010,134 +998,26 @@
                 `;
             });
 
-            // Display campuses if available
-            if (data.campuses && data.campuses.length > 0) {
+            // Display children if available
+            if (data.children && data.children.length > 0) {
                 html += `
                     <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
-                        <span class="field-label" style="font-size: 16px; color: #183162;">📍 Campuses (${data.campuses.length}):</span>
+                        <span class="field-label" style="font-size: 16px; color: #183162;">👶 Children (${data.children.length}):</span>
                         <span class="field-value"></span>
                     </div>
                 `;
 
-                data.campuses.forEach(campus => {
+                data.children.forEach(child => {
+                    const childName = `${child.givenName || ''} ${child.familyName || ''}`.trim() || 'Unknown';
+                    const email = child.email || 'No email';
+                    const grade = child.grade || 'N/A';
+                    const sourcedId = child.sourcedId || 'No ID';
+
                     html += `
                         <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                            <span class="field-label">${campus.name}</span>
+                            <span class="field-label">${childName}</span>
                             <span class="field-value" style="font-size: 12px; color: #666;">
-                                Campus ID: ${campus.id}
-                            </span>
-                        </div>
-                    `;
-                });
-            }
-
-            // Display parents if available
-            if (data.parents && data.parents.length > 0) {
-                html += `
-                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
-                        <span class="field-label" style="font-size: 16px; color: #183162;">👨‍👩‍👧‍👦 Parents (${data.parents.length}):</span>
-                        <span class="field-value"></span>
-                    </div>
-                `;
-
-                data.parents.forEach(parent => {
-                    const parentName = `${parent.givenName || ''} ${parent.familyName || ''}`.trim() || 'Unknown';
-                    const email = parent.email || 'No email';
-                    const phone = parent.phone || 'No phone';
-
-                    // Check if we have enriched guardian account status for this parent
-                    let accountStatus = null;
-                    if (enrichedData && enrichedData.guardiansAccount) {
-                        const matchedGuardian = enrichedData.guardiansAccount.find(g =>
-                            g.email && parent.email && g.email.toLowerCase() === parent.email.toLowerCase()
-                        );
-                        if (matchedGuardian) {
-                            accountStatus = matchedGuardian.accountStatus;
-                        }
-                    }
-
-                    // Format account status with color coding
-                    let statusBadge = '';
-                    if (accountStatus) {
-                        let statusColor = '#999';
-                        let statusText = accountStatus.replace(/_/g, ' ');
-
-                        if (accountStatus === 'ACTIVE' || accountStatus.includes('VERIFIED')) {
-                            statusColor = '#15b79e';
-                        } else if (accountStatus === 'INVITATION_NOT_SENT') {
-                            statusColor = '#ff6227';
-                        } else if (accountStatus.includes('PENDING') || accountStatus.includes('SENT')) {
-                            statusColor = '#ffa726';
-                        }
-
-                        statusBadge = `<br><span style="background: ${statusColor}; color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; margin-top: 4px; display: inline-block;">${statusText}</span>`;
-                    }
-
-                    html += `
-                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                            <span class="field-label">${parentName}</span>
-                            <span class="field-value" style="font-size: 12px; color: #666;">
-                                ${email}<br>${phone}${statusBadge}
-                            </span>
-                        </div>
-                    `;
-                });
-            }
-
-            // Display enrolled classes if available (shown under parents section as requested)
-            if (data.enrollments && data.enrollments.length > 0) {
-                html += `
-                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
-                        <span class="field-label" style="font-size: 16px; color: #183162;">📚 Enrolled Classes (${data.enrollments.length}):</span>
-                        <span class="field-value"></span>
-                    </div>
-                `;
-
-                data.enrollments.forEach(enrollment => {
-                    const className = enrollment.className || 'Unknown Class';
-                    const classCode = enrollment.classCode || '';
-                    const subjects = enrollment.subjects ? (Array.isArray(enrollment.subjects) ? enrollment.subjects.join(', ') : enrollment.subjects) : '';
-                    const status = enrollment.status || 'active';
-                    const statusColor = status === 'active' ? '#15b79e' : '#999';
-
-                    // Build class details line
-                    let classDetails = `<span style="color: ${statusColor}; font-weight: 600;">${status}</span>`;
-                    if (classCode) {
-                        classDetails += ` | Code: ${classCode}`;
-                    }
-                    if (subjects) {
-                        classDetails += `<br><span style="color: #999;">Subjects: ${subjects}</span>`;
-                    }
-
-                    html += `
-                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                            <span class="field-label" style="color: #183162;">${className}</span>
-                            <span class="field-value" style="font-size: 12px;">
-                                ${classDetails}
-                            </span>
-                        </div>
-                    `;
-                });
-            }
-
-            // Display siblings if available
-            if (data.siblings && data.siblings.length > 0) {
-                html += `
-                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
-                        <span class="field-label" style="font-size: 16px; color: #183162;">👫 Siblings (${data.siblings.length}):</span>
-                        <span class="field-value"></span>
-                    </div>
-                `;
-
-                data.siblings.forEach(sibling => {
-                    const siblingName = `${sibling.givenName || ''} ${sibling.familyName || ''}`.trim() || 'Unknown';
-                    const grade = sibling.grade || 'N/A';
-                    const sourcedId = sibling.sourcedId || 'No ID';
-                    html += `
-                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                            <span class="field-label">${siblingName}</span>
-                            <span class="field-value" style="font-size: 12px; color: #666;">
-                                Grade ${grade} | ID: ${sourcedId}
+                                Grade ${grade} | ${email}<br>Student ID: ${sourcedId}
                             </span>
                         </div>
                     `;
@@ -1156,7 +1036,7 @@
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `student-comparison-${new Date().toISOString().slice(0,10)}.csv`;
+            a.download = `parent-comparison-${new Date().toISOString().slice(0,10)}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -1168,7 +1048,7 @@
             const headers = ['Field', 'Bookmarked', 'ClassLink', 'Match'];
             const rows = [];
 
-            const fields = ['sourcedId', 'givenName', 'familyName', 'email', 'grade', 'campus', 'status'];
+            const fields = ['sourcedId', 'givenName', 'familyName', 'email', 'phone', 'accountStatus'];
 
             fields.forEach(field => {
                 const bookmarkedValue = data.bookmarked_data ? data.bookmarked_data[field] : '';

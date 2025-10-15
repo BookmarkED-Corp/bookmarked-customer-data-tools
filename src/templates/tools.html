@@ -365,12 +365,12 @@
             </div>
 
             <!-- Parent Search Tool -->
-            <div class="tool-card">
+            <div class="tool-card enabled">
                 <h3><span class="icon">👨‍👩‍👧</span> Parent Search</h3>
-                <span class="status coming-soon">Coming Soon</span>
+                <span class="status available">Available</span>
                 <p>Search for parents and view all related students. Compare parent contact information and relationships between source and Bookmarked.</p>
-                <button class="btn btn-secondary" disabled>
-                    Coming Soon
+                <button class="btn btn-primary" id="btn-parent-search" disabled>
+                    Launch Parent Search
                 </button>
             </div>
 
@@ -429,6 +429,7 @@
         const selectedInfo = document.getElementById('selected-info');
         const loading = document.getElementById('loading');
         const btnStudentSearch = document.getElementById('btn-student-search');
+        const btnParentSearch = document.getElementById('btn-parent-search');
 
         // Load from localStorage if exists
         const savedSelection = localStorage.getItem('selectedDistrict');
@@ -553,6 +554,18 @@
             }
         });
 
+        btnParentSearch.addEventListener('click', () => {
+            if (selectedDistrict) {
+                // Save to sessionStorage for parent search page
+                sessionStorage.setItem('selected_district_id', selectedDistrict.id);
+                sessionStorage.setItem('selected_district_name', selectedDistrict.name);
+                sessionStorage.setItem('selected_environment', selectedDistrict.environment);
+
+                // Navigate to parent search
+                window.location.href = '/tools/parent-search';
+            }
+        });
+
         // Select district function
         function selectDistrict(id, name) {
             selectedDistrict = {
@@ -611,6 +624,7 @@
         function updateToolButtons() {
             const enabled = selectedDistrict !== null;
             btnStudentSearch.disabled = !enabled;
+            btnParentSearch.disabled = !enabled;
         }
 
         // Initial state
