@@ -251,13 +251,63 @@ Streamline the process of diagnosing and resolving customer data issues by provi
 - View/test connection to customer source data
 - Import/export customer configs
 
-**4. Diagnostic Tools**
-- Tool selector
-- Input forms
-- Progress indicators during data retrieval
-- Results display with clear status
-- Action buttons for remediation
-- HubSpot ticket integration
+**4. Diagnostic Tools Dashboard (`/tools`)**
+
+**Unified Tools Page Architecture** (Implemented)
+
+This is the main entry point for all diagnostic tools. The page provides a centralized, app-like interface for district selection and tool access.
+
+*Key Features:*
+
+- **Environment Selector**
+  - Dropdown to select staging or production environment
+  - Selection persists across page navigation
+  - Changes environment for both district search and tool execution
+
+- **Searchable District Picker**
+  - Real-time search input field (minimum 3 characters required)
+  - Search by district name OR district ID
+  - Live filtering with autocomplete dropdown
+  - Shows first 50 matching results
+  - Displays: "Showing first 50 of X matches. Keep typing to narrow down..."
+  - Click-to-select from dropdown results
+  - Selected district displayed prominently with ID and environment
+
+- **Tool Cards Grid**
+  - Visual grid layout of available diagnostic tools
+  - Each card shows:
+    - Tool icon
+    - Tool name
+    - Brief description
+    - Status badge (Available / Coming Soon)
+  - Tools initially shown:
+    1. **Student Search** (Available) - Compare student data across systems
+    2. Student Mismatch Resolver (Coming Soon)
+    3. Missing Data Finder (Coming Soon)
+    4. Parent Email Conflicts (Coming Soon)
+    5. Campus Transfer Validator (Coming Soon)
+    6. Data Quality Report (Coming Soon)
+
+- **Tool Launch Behavior**
+  - Tools are disabled until district is selected
+  - Clicking enabled tool button:
+    - Saves district info to sessionStorage (district_id, district_name, environment)
+    - Navigates to tool-specific page
+  - Tool pages can link back with "Change District" option
+
+*Technical Implementation:*
+- Uses localStorage for district selection persistence
+- Uses sessionStorage for passing district info to tool pages
+- Implements minimum 3-character search to prevent overwhelming results
+- Limits dropdown results to 50 for performance
+- All district data fetched from `/api/districts` endpoint
+
+*Navigation Flow:*
+```
+Dashboard → /tools (select district + tool) → /tools/student-search
+                                            ↓
+                                "Change District" link returns to /tools
+```
 
 **5. HubSpot Ticket Processor**
 - Ticket URL/number input
