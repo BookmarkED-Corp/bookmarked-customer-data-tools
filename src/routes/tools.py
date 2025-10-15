@@ -364,10 +364,53 @@ def get_student_details(student_id):
 
         db.disconnect()
 
+        # 3. Try to get enriched data from Bookmarked API (guardian account status, restrictions, checkouts)
+        enriched_data = None
+        if campuses and len(campuses) > 0 and 'api' in env_config:
+            try:
+                from src.connectors.bookmarked_api import BookmarkedAPIConnector
+
+                api = BookmarkedAPIConnector(environment=environment)
+                api_config = env_config['api']
+
+                # Connect to API with JWT auth
+                connected = api.connect(
+                    base_url=api_config.get('base_url'),
+                    username=api_config.get('username'),
+                    password=api_config.get('password')
+                )
+
+                if connected:
+                    # Use the first campus ID
+                    campus_id = campuses[0]['id']
+
+                    # Search by student ID (sourcedId)
+                    enriched_response = api.get_enriched_student_data(
+                        campus_id=campus_id,
+                        search_query=bookmarked_data.get('sourcedId', '')
+                    )
+
+                    if enriched_response and enriched_response.get('data'):
+                        # Get the first matching student from enriched data
+                        enriched_students = enriched_response.get('data', [])
+                        if enriched_students:
+                            enriched_data = enriched_students[0]
+                            logger.info("Enriched student data retrieved",
+                                       student_id=student_id,
+                                       restricted_books=enriched_data.get('numberOfBooksRestricted'),
+                                       checkout_count=enriched_data.get('checkoutCounts'))
+
+                    api.disconnect()
+            except Exception as enriched_error:
+                logger.warning("Failed to get enriched student data",
+                             error=str(enriched_error))
+                # Continue without enriched data
+
         return jsonify({
             'success': True,
             'student': True,
-            'bookmarked_data': bookmarked_data
+            'bookmarked_data': bookmarked_data,
+            'enriched_data': enriched_data  # Add enriched data to response
         })
 
     except Exception as e:
@@ -742,13 +785,65 @@ def search_student():
                             district_id=district_id,
                             error=str(classlink_error))
 
+        # 3. Try to get enriched data and ClassLink sync status from Bookmarked API
+        enriched_data = None
+        classlink_sync_status = None
+
+        if bookmarked_data and 'campuses' in bookmarked_data and len(bookmarked_data['campuses']) > 0 and 'api' in env_config:
+            try:
+                from src.connectors.bookmarked_api import BookmarkedAPIConnector
+
+                api = BookmarkedAPIConnector(environment=environment)
+                api_config = env_config['api']
+
+                # Connect to API with JWT auth
+                connected = api.connect(
+                    base_url=api_config.get('base_url'),
+                    username=api_config.get('username'),
+                    password=api_config.get('password')
+                )
+
+                if connected:
+                    # Use the first campus ID
+                    campus_id = bookmarked_data['campuses'][0]['id']
+
+                    # Fetch enriched student data
+                    enriched_response = api.get_enriched_student_data(
+                        campus_id=campus_id,
+                        search_query=bookmarked_data.get('sourcedId', '')
+                    )
+
+                    if enriched_response and enriched_response.get('data'):
+                        # Get the first matching student from enriched data
+                        enriched_students = enriched_response.get('data', [])
+                        if enriched_students:
+                            enriched_data = enriched_students[0]
+                            logger.info("Enriched student data retrieved from search",
+                                       sourcedId=bookmarked_data.get('sourcedId'),
+                                       restricted_books=enriched_data.get('numberOfBooksRestricted'),
+                                       checkout_count=enriched_data.get('checkoutCounts'))
+
+                    # Fetch ClassLink sync status for district
+                    classlink_sync_status = api.get_classlink_sync_status(district_id)
+                    if classlink_sync_status:
+                        logger.info("ClassLink sync status retrieved",
+                                   district_id=district_id)
+
+                    api.disconnect()
+            except Exception as enriched_error:
+                logger.warning("Failed to get enriched student data in search",
+                             error=str(enriched_error))
+                # Continue without enriched data
+
         # Prepare response
         if bookmarked_data:
             response = {
                 'success': True,
                 'student': True,
                 'bookmarked_data': bookmarked_data,
-                'classlink_data': classlink_data
+                'classlink_data': classlink_data,
+                'enriched_data': enriched_data,
+                'classlink_sync_status': classlink_sync_status
             }
 
             # Include error message if ClassLink search failed but Bookmarked data exists

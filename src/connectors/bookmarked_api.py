@@ -439,6 +439,137 @@ class BookmarkedAPIConnector:
                         error=str(e))
             raise
 
+    def get_enriched_student_data(self, campus_id: int, search_query: str,
+                                   role: str = 'ADMIN', page: int = 1,
+                                   page_size: int = 10) -> Optional[Dict[str, Any]]:
+        """
+        Get enriched student data including guardian account status, book restrictions, and checkout counts
+
+        This endpoint provides operational data not available in OneRoster:
+        - Guardian account status (invitation sent/not sent, active, etc.)
+        - Number of restricted books
+        - Checkout counts
+
+        Args:
+            campus_id: Campus ID to search within
+            search_query: Student name, ID, or email
+            role: User role (default: ADMIN)
+            page: Page number for pagination
+            page_size: Number of results per page
+
+        Returns:
+            Dict with metadata and data array containing enriched student records, or None if failed
+        """
+        if not self.base_url or not self.jwt_token:
+            raise RuntimeError("API not connected. Call connect() first.")
+
+        try:
+            url = f"{self.base_url}/students/student/list"
+
+            params = {
+                'campusId': campus_id,
+                'page': page,
+                'pageSize': page_size,
+                'searchQuery': search_query,
+                'sortColumn': 'restrictedBookCount',
+                'sortDirection': 'DESC',
+                'grades': 'ALL',
+                'restrictedBooksRanges': [0, 100000],
+                'accountSetUpFilter': 'ALL'
+            }
+
+            headers = {
+                'Authorization': f'Bearer {self.jwt_token}',
+                'x-campus-id': str(campus_id),
+                'x-locale': 'en',
+                'x-role': role
+            }
+
+            logger.info("Fetching enriched student data",
+                       environment=self.environment,
+                       campus_id=campus_id,
+                       search_query=search_query)
+
+            response = self.session.get(
+                url,
+                headers=headers,
+                params=params,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info("Enriched student data fetched successfully",
+                           environment=self.environment,
+                           total_results=data.get('metadata', {}).get('total', 0))
+                return data
+            else:
+                logger.error("Failed to get enriched student data",
+                            environment=self.environment,
+                            status_code=response.status_code,
+                            response=response.text[:200])
+                return None
+
+        except Exception as e:
+            logger.error("Error getting enriched student data",
+                        environment=self.environment,
+                        error=str(e))
+            return None
+
+    def get_classlink_sync_status(self, district_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Get ClassLink sync status for a district
+
+        Shows when ClassLink data was last synced for the district.
+
+        Args:
+            district_id: District ID
+
+        Returns:
+            Dict with sync status information or None if failed
+        """
+        if not self.base_url or not self.jwt_token:
+            raise RuntimeError("API not connected. Call connect() first.")
+
+        try:
+            url = f"{self.base_url}/classlink/classlink-sync-status/{district_id}"
+
+            headers = {
+                'Authorization': f'Bearer {self.jwt_token}',
+                'x-locale': 'en'
+            }
+
+            logger.info("Fetching ClassLink sync status",
+                       environment=self.environment,
+                       district_id=district_id)
+
+            response = self.session.get(
+                url,
+                headers=headers,
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                logger.info("ClassLink sync status retrieved",
+                           environment=self.environment,
+                           district_id=district_id)
+                return data
+            else:
+                logger.error("Failed to get ClassLink sync status",
+                            environment=self.environment,
+                            district_id=district_id,
+                            status_code=response.status_code,
+                            response=response.text[:200])
+                return None
+
+        except Exception as e:
+            logger.error("Error getting ClassLink sync status",
+                        environment=self.environment,
+                        district_id=district_id,
+                        error=str(e))
+            return None
+
     def disconnect(self):
         """Close API session"""
         self.session.close()

@@ -728,15 +728,59 @@
 
             const bookmarked = data.bookmarked_data || {};
             const classlink = data.classlink_data || {};
+            const enriched = data.enriched_data || null;
+            const syncStatus = data.classlink_sync_status || null;
 
-            // Build Bookmarked side
-            bookmarkedDiv.innerHTML = buildDataFields(bookmarked, classlink);
+            // Build Bookmarked side (pass enriched data for enhanced display)
+            bookmarkedDiv.innerHTML = buildDataFields(bookmarked, classlink, enriched);
 
-            // Build ClassLink side
-            classlinkDiv.innerHTML = buildDataFields(classlink, bookmarked);
+            // Build ClassLink side with sync status banner
+            let classlinkHtml = '';
 
-            // Populate raw data view
-            document.getElementById('raw-bookmarked').textContent = JSON.stringify(bookmarked, null, 2);
+            // Add ClassLink sync status banner if available
+            if (syncStatus) {
+                const lastSync = syncStatus.lastSync || syncStatus.lastSyncDate || null;
+                if (lastSync) {
+                    const syncDate = new Date(lastSync);
+                    const now = new Date();
+                    const diffMs = now - syncDate;
+                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+                    let syncColor = '#15b79e';  // Green
+                    if (diffDays > 7) {
+                        syncColor = '#ff6227';  // Orange/red
+                    } else if (diffDays > 1) {
+                        syncColor = '#ffa726';  // Yellow/orange
+                    }
+
+                    let syncText = '';
+                    if (diffDays > 0) {
+                        syncText = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                    } else if (diffHours > 0) {
+                        syncText = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                    } else {
+                        syncText = 'Less than an hour ago';
+                    }
+
+                    classlinkHtml += `
+                        <div style="background: ${syncColor}; color: white; padding: 10px; border-radius: 4px; margin-bottom: 15px; text-align: center;">
+                            <strong>🔄 Last ClassLink Sync:</strong> ${syncText}
+                        </div>
+                    `;
+                }
+            }
+
+            classlinkHtml += buildDataFields(classlink, bookmarked);
+            classlinkDiv.innerHTML = classlinkHtml;
+
+            // Populate raw data view (include enriched data and sync status)
+            const rawBookmarkedData = {
+                ...bookmarked,
+                enriched: enriched,
+                classlink_sync_status: syncStatus
+            };
+            document.getElementById('raw-bookmarked').textContent = JSON.stringify(rawBookmarkedData, null, 2);
             document.getElementById('raw-classlink').textContent = classlink ? JSON.stringify(classlink, null, 2) : 'No ClassLink data available';
 
             // Show comparison and buttons
@@ -785,12 +829,38 @@
         }
 
         // Build data fields
-        function buildDataFields(data, compareData) {
+        function buildDataFields(data, compareData, enrichedData) {
             if (!data || Object.keys(data).length === 0) {
                 return '<div class="no-results">No data found</div>';
             }
 
             let html = '';
+
+            // Show operational stats at the top if we have enriched data
+            if (enrichedData) {
+                const restrictedBooks = enrichedData.numberOfBooksRestricted || 0;
+                const checkouts = enrichedData.checkoutCounts || 0;
+                const restrictedColor = restrictedBooks > 0 ? '#ff6227' : '#15b79e';
+
+                html += `
+                    <div class="field-row" style="background: #f0f8ff; border: 2px solid #183162; margin-bottom: 15px;">
+                        <span class="field-label" style="font-size: 14px; color: #183162;"><strong>📊 Account Status</strong></span>
+                        <span class="field-value"></span>
+                    </div>
+                    <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                        <span class="field-label">Restricted Books:</span>
+                        <span class="field-value" style="color: ${restrictedColor}; font-weight: 600;">
+                            ${restrictedBooks}
+                        </span>
+                    </div>
+                    <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                        <span class="field-label">Total Checkouts:</span>
+                        <span class="field-value" style="color: #183162; font-weight: 600;">
+                            ${checkouts}
+                        </span>
+                    </div>
+                `;
+            }
 
             const fields = [
                 { key: 'sourcedId', label: 'Source ID' },
@@ -876,11 +946,40 @@
                     const parentName = `${parent.givenName || ''} ${parent.familyName || ''}`.trim() || 'Unknown';
                     const email = parent.email || 'No email';
                     const phone = parent.phone || 'No phone';
+
+                    // Check if we have enriched guardian account status for this parent
+                    let accountStatus = null;
+                    if (enrichedData && enrichedData.guardiansAccount) {
+                        const matchedGuardian = enrichedData.guardiansAccount.find(g =>
+                            g.email && parent.email && g.email.toLowerCase() === parent.email.toLowerCase()
+                        );
+                        if (matchedGuardian) {
+                            accountStatus = matchedGuardian.accountStatus;
+                        }
+                    }
+
+                    // Format account status with color coding
+                    let statusBadge = '';
+                    if (accountStatus) {
+                        let statusColor = '#999';
+                        let statusText = accountStatus.replace(/_/g, ' ');
+
+                        if (accountStatus === 'ACTIVE' || accountStatus.includes('VERIFIED')) {
+                            statusColor = '#15b79e';
+                        } else if (accountStatus === 'INVITATION_NOT_SENT') {
+                            statusColor = '#ff6227';
+                        } else if (accountStatus.includes('PENDING') || accountStatus.includes('SENT')) {
+                            statusColor = '#ffa726';
+                        }
+
+                        statusBadge = `<br><span style="background: ${statusColor}; color: white; padding: 2px 6px; border-radius: 8px; font-size: 10px; font-weight: 600; margin-top: 4px; display: inline-block;">${statusText}</span>`;
+                    }
+
                     html += `
                         <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
                             <span class="field-label">${parentName}</span>
                             <span class="field-value" style="font-size: 12px; color: #666;">
-                                ${email}<br>${phone}
+                                ${email}<br>${phone}${statusBadge}
                             </span>
                         </div>
                     `;
