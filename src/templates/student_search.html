@@ -240,15 +240,16 @@
         <div class="header">
             <h1>🔍 Find Student</h1>
             <nav>
-                <a href="/district-select">← Back to District Selection</a>
+                <a href="/tools">← Back to Tools</a>
                 <a href="/connections/setup">⚙ Settings</a>
             </nav>
         </div>
 
         <div class="content">
             <div id="district-info" class="alert info">
-                <strong>Selected District:</strong> <span id="current-district">--</span><br>
-                <strong>Environment:</strong> <span id="current-environment">--</span>
+                <strong>Selected District:</strong> <span id="current-district">--</span> (ID: <span id="current-district-id">--</span>)<br>
+                <strong>Environment:</strong> <span id="current-environment">--</span><br>
+                <a href="/tools" style="color: #0c5460; font-weight: 600; text-decoration: underline;">Change District</a>
             </div>
 
             <!-- Search Form -->
@@ -302,11 +303,12 @@
 
         // Display current district
         document.getElementById('current-district').textContent = selectedDistrictName;
+        document.getElementById('current-district-id').textContent = selectedDistrictId || '--';
         document.getElementById('current-environment').textContent = selectedEnvironment.toUpperCase();
 
         if (!selectedDistrictId) {
             document.getElementById('district-info').className = 'alert error';
-            document.getElementById('district-info').innerHTML = '<strong>Error:</strong> No district selected. Please go back and select a district first.';
+            document.getElementById('district-info').innerHTML = '<strong>Error:</strong> No district selected. <a href="/tools" style="color: #721c24; font-weight: 600; text-decoration: underline;">Go to Tools to select a district</a>';
         }
 
         // Search for student

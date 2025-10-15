@@ -543,6 +543,12 @@
         // Tool button handlers
         btnStudentSearch.addEventListener('click', () => {
             if (selectedDistrict) {
+                // Save to sessionStorage for student search page
+                sessionStorage.setItem('selected_district_id', selectedDistrict.id);
+                sessionStorage.setItem('selected_district_name', selectedDistrict.name);
+                sessionStorage.setItem('selected_environment', selectedDistrict.environment);
+
+                // Navigate to student search
                 window.location.href = '/tools/student-search';
             }
         });
