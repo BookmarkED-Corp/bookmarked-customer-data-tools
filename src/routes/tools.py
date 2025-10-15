@@ -51,7 +51,6 @@ def get_districts():
             SELECT id, name, "createdAt"
             FROM "District"
             ORDER BY name
-            LIMIT 100
         """
 
         # For this to work, we need to establish connection first

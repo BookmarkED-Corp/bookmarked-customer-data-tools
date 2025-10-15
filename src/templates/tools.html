@@ -466,31 +466,51 @@
 
         // District search input handler
         districtSearch.addEventListener('input', (e) => {
-            const query = e.target.value.toLowerCase().trim();
+            const query = e.target.value.trim();
 
-            if (!query) {
-                districtResults.classList.remove('visible');
+            // Require at least 3 characters before searching
+            if (query.length < 3) {
+                if (query.length === 0) {
+                    districtResults.classList.remove('visible');
+                } else {
+                    districtResults.innerHTML = '<div class="no-results">Type at least 3 characters to search...</div>';
+                    districtResults.classList.add('visible');
+                }
                 return;
             }
 
+            const queryLower = query.toLowerCase();
+
             // Filter districts by name OR id
             const filtered = districts.filter(d => {
-                const nameMatch = d.name.toLowerCase().includes(query);
+                const nameMatch = d.name.toLowerCase().includes(queryLower);
                 const idMatch = String(d.id).includes(query);
                 return nameMatch || idMatch;
             });
+
+            // Limit results to first 50 for performance
+            const displayResults = filtered.slice(0, 50);
 
             // Show results
             if (filtered.length === 0) {
                 districtResults.innerHTML = '<div class="no-results">No districts found</div>';
                 districtResults.classList.add('visible');
             } else {
-                districtResults.innerHTML = filtered.map(d => `
+                let html = displayResults.map(d => `
                     <div class="search-result-item" data-id="${d.id}" data-name="${d.name}">
                         <span class="district-name">${d.name}</span>
                         <span class="district-id">ID: ${d.id}</span>
                     </div>
                 `).join('');
+
+                // Show count if there are more results
+                if (filtered.length > 50) {
+                    html += `<div class="no-results" style="border-top: 2px solid #e0e0e0; font-style: normal; font-weight: 600;">
+                        Showing first 50 of ${filtered.length} matches. Keep typing to narrow down...
+                    </div>`;
+                }
+
+                districtResults.innerHTML = html;
                 districtResults.classList.add('visible');
 
                 // Add click handlers to results
@@ -505,27 +525,11 @@
             }
         });
 
-        // Focus handler - show all if no selection
+        // Focus handler - show hint
         districtSearch.addEventListener('focus', () => {
             if (!districtSearch.value && districts.length > 0) {
-                // Show top 10 districts
-                const top10 = districts.slice(0, 10);
-                districtResults.innerHTML = top10.map(d => `
-                    <div class="search-result-item" data-id="${d.id}" data-name="${d.name}">
-                        <span class="district-name">${d.name}</span>
-                        <span class="district-id">ID: ${d.id}</span>
-                    </div>
-                `).join('');
+                districtResults.innerHTML = '<div class="no-results">Type at least 3 characters to search districts by name or ID...</div>';
                 districtResults.classList.add('visible');
-
-                districtResults.querySelectorAll('.search-result-item').forEach(item => {
-                    item.addEventListener('click', () => {
-                        selectDistrict(
-                            parseInt(item.dataset.id),
-                            item.dataset.name
-                        );
-                    });
-                });
             }
         });
 
