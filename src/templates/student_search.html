@@ -683,6 +683,45 @@
             document.getElementById('toggle-raw-btn').style.display = 'block';
         }
 
+        // Format date with relative time
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffSecs = Math.floor(diffMs / 1000);
+            const diffMins = Math.floor(diffSecs / 60);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            const diffMonths = Math.floor(diffDays / 30);
+            const diffYears = Math.floor(diffDays / 365);
+
+            let relativeTime;
+            if (diffYears > 0) {
+                relativeTime = `${diffYears} year${diffYears > 1 ? 's' : ''} ago`;
+            } else if (diffMonths > 0) {
+                relativeTime = `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+            } else if (diffDays > 0) {
+                relativeTime = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            } else if (diffHours > 0) {
+                relativeTime = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            } else if (diffMins > 0) {
+                relativeTime = `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+            } else {
+                relativeTime = 'Just now';
+            }
+
+            // Format actual date (date only, no time)
+            const actualDate = date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+
+            return `${relativeTime}<br><span style="font-size: 11px; color: #999;">${actualDate}</span>`;
+        }
+
         // Build data fields
         function buildDataFields(data, compareData) {
             if (!data || Object.keys(data).length === 0) {
@@ -698,8 +737,8 @@
                 { key: 'email', label: 'Email' },
                 { key: 'grade', label: 'Grade' },
                 { key: 'isDeleted', label: 'Is Deleted' },
-                { key: 'createdAt', label: 'Created' },
-                { key: 'updatedAt', label: 'Updated' }
+                { key: 'createdAt', label: 'Created', isDate: true },
+                { key: 'updatedAt', label: 'Updated', isDate: true }
             ];
 
             fields.forEach(field => {
@@ -722,11 +761,19 @@
                     indicator = '<span class="indicator mismatch">✗</span>';
                 }
 
+                // Format the value - use formatDate for date fields
+                let displayValue;
+                if (field.isDate) {
+                    displayValue = value ? formatDate(value) : '<em>Not found</em>';
+                } else {
+                    displayValue = value || '<em>Not found</em>';
+                }
+
                 html += `
                     <div class="field-row">
                         <span class="field-label">${field.label}:</span>
                         <span class="field-value ${className}">
-                            ${value || '<em>Not found</em>'}
+                            ${displayValue}
                             ${indicator}
                         </span>
                     </div>
