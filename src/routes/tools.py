@@ -622,15 +622,20 @@ def search_student():
                             classlink = ClassLinkConnector()
                             api_key = defaults['classlink']['api_key']
 
-                            # Search for student in ClassLink
-                            # Note: We'll fetch a batch and filter by search term
-                            students = classlink.get_students(
+                            # Fetch all users (students AND parents) from ClassLink
+                            # This allows us to match parents using the agents array
+                            all_users = classlink.get_users(
                                 bearer_token=api_key,
                                 oneroster_app_id=oneroster_app_id,
-                                limit=100
+                                limit=500  # Get more users to include parents
                             )
 
+                            # Separate students and parents
+                            students = [u for u in all_users if u.get('role') == 'student']
+                            parents_and_guardians = [u for u in all_users if u.get('role') in ['parent', 'guardian']]
+
                             # Filter students by search term
+                            matched_student = None
                             for student in students:
                                 student_id = student.get('sourcedId', '')
                                 given_name = student.get('givenName', '')
@@ -647,22 +652,51 @@ def search_student():
                                     search_lower in email.lower() or
                                     search_lower in full_name):
 
-                                    classlink_data = {
-                                        'sourcedId': student.get('sourcedId'),
-                                        'givenName': student.get('givenName'),
-                                        'familyName': student.get('familyName'),
-                                        'email': student.get('email'),
-                                        'grade': student.get('grades', [''])[0] if student.get('grades') else None,
-                                        'status': student.get('status'),
-                                        'identifier': student.get('identifier'),
-                                        'metadata': student.get('metadata'),
-                                        'orgs': student.get('orgs', [])  # Schools
-                                    }
-
+                                    matched_student = student
                                     logger.info("ClassLink student found",
                                                sourcedId=student.get('sourcedId'),
                                                oneroster_app_id=oneroster_app_id)
                                     break
+
+                            # If student found, build response with parent matching
+                            if matched_student:
+                                classlink_data = {
+                                    'sourcedId': matched_student.get('sourcedId'),
+                                    'givenName': matched_student.get('givenName'),
+                                    'familyName': matched_student.get('familyName'),
+                                    'email': matched_student.get('email'),
+                                    'grade': matched_student.get('grades', [''])[0] if matched_student.get('grades') else None,
+                                    'status': matched_student.get('status'),
+                                    'identifier': matched_student.get('identifier'),
+                                    'metadata': matched_student.get('metadata'),
+                                    'orgs': matched_student.get('orgs', []),  # Schools
+                                    'parents': []
+                                }
+
+                                # Match parents using agents array
+                                # In OneRoster, student.agents contains parent sourcedIds
+                                agents = matched_student.get('agents', [])
+                                if agents:
+                                    parent_sourceids = [agent.get('sourcedId') for agent in agents if agent.get('type') in ['Parent', 'Guardian', 'parent', 'guardian']]
+
+                                    # Find matching parents
+                                    for parent_sourceid in parent_sourceids:
+                                        parent_user = next((p for p in parents_and_guardians if p.get('sourcedId') == parent_sourceid), None)
+                                        if parent_user:
+                                            classlink_data['parents'].append({
+                                                'sourcedId': parent_user.get('sourcedId'),
+                                                'givenName': parent_user.get('givenName'),
+                                                'familyName': parent_user.get('familyName'),
+                                                'email': parent_user.get('email'),
+                                                'phone': parent_user.get('phone') or parent_user.get('sms'),
+                                                'role': parent_user.get('role')
+                                            })
+
+                                    logger.info("ClassLink parents matched",
+                                               student_sourcedId=matched_student.get('sourcedId'),
+                                               parent_count=len(classlink_data['parents']))
+                            else:
+                                classlink_data = None
 
                             if not classlink_data:
                                 classlink_error_message = 'No matching student found in ClassLink'

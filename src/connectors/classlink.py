@@ -282,6 +282,47 @@ class ClassLinkConnector:
                         error=str(e))
             return None
 
+    def get_users(self, bearer_token: str, oneroster_app_id: str,
+                  limit: int = 100, offset: int = 0, role: Optional[str] = None) -> List[Dict]:
+        """
+        Get users from ClassLink for a specific district
+
+        Args:
+            bearer_token: ClassLink Bearer token
+            oneroster_app_id: OneRoster application ID
+            limit: Maximum number of results (default 100)
+            offset: Offset for pagination (default 0)
+            role: Optional filter by role (student, parent, guardian, teacher, etc.)
+
+        Returns:
+            List of user dictionaries
+        """
+        # Get district credentials
+        creds = self.get_district_credentials(bearer_token, oneroster_app_id)
+        if not creds:
+            logger.error("Cannot get users - no credentials available")
+            return []
+
+        # Create OneRoster client
+        client = OneRosterClient(creds['client_id'], creds['client_secret'])
+
+        # Fetch users
+        url = f"{creds['endpoint_url']}/ims/oneroster/v1p1/users"
+        params = {'limit': limit, 'offset': offset, 'orderBy': 'asc'}
+
+        data = client.make_request(url, params)
+        if data:
+            users = data.get('users', [])
+
+            # Filter by role if specified
+            if role:
+                users = [u for u in users if u.get('role') == role]
+
+            logger.info("Retrieved users", count=len(users), role=role, oneroster_app_id=oneroster_app_id)
+            return users
+
+        return []
+
     def get_students(self, bearer_token: str, oneroster_app_id: str,
                     limit: int = 100, offset: int = 0) -> List[Dict]:
         """
@@ -296,27 +337,7 @@ class ClassLinkConnector:
         Returns:
             List of student dictionaries
         """
-        # Get district credentials
-        creds = self.get_district_credentials(bearer_token, oneroster_app_id)
-        if not creds:
-            logger.error("Cannot get students - no credentials available")
-            return []
-
-        # Create OneRoster client
-        client = OneRosterClient(creds['client_id'], creds['client_secret'])
-
-        # Fetch students
-        url = f"{creds['endpoint_url']}/ims/oneroster/v1p1/users"
-        params = {'limit': limit, 'offset': offset, 'orderBy': 'asc'}
-
-        data = client.make_request(url, params)
-        if data:
-            users = data.get('users', [])
-            students = [u for u in users if u.get('role') == 'student']
-            logger.info("Retrieved students", count=len(students), oneroster_app_id=oneroster_app_id)
-            return students
-
-        return []
+        return self.get_users(bearer_token, oneroster_app_id, limit, offset, role='student')
 
     def get_schools(self, bearer_token: str, oneroster_app_id: str,
                    limit: int = 100, offset: int = 0) -> List[Dict]:
