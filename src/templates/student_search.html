@@ -863,29 +863,6 @@
                 });
             }
 
-            // Display enrollments if available
-            if (data.enrollments && data.enrollments.length > 0) {
-                html += `
-                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
-                        <span class="field-label" style="font-size: 16px; color: #183162;">📚 Enrollments (${data.enrollments.length}):</span>
-                        <span class="field-value"></span>
-                    </div>
-                `;
-
-                data.enrollments.forEach(enrollment => {
-                    const status = enrollment.status || 'active';
-                    const statusColor = status === 'active' ? '#15b79e' : '#999';
-                    html += `
-                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
-                            <span class="field-label">${enrollment.sourcedId || 'Class'}</span>
-                            <span class="field-value" style="font-size: 12px; color: ${statusColor};">
-                                ${enrollment.role || 'student'} | ${status}
-                            </span>
-                        </div>
-                    `;
-                });
-            }
-
             // Display parents if available
             if (data.parents && data.parents.length > 0) {
                 html += `
@@ -904,6 +881,42 @@
                             <span class="field-label">${parentName}</span>
                             <span class="field-value" style="font-size: 12px; color: #666;">
                                 ${email}<br>${phone}
+                            </span>
+                        </div>
+                    `;
+                });
+            }
+
+            // Display enrolled classes if available (shown under parents section as requested)
+            if (data.enrollments && data.enrollments.length > 0) {
+                html += `
+                    <div class="field-row" style="border-top: 2px solid #e0e0e0; margin-top: 10px; padding-top: 15px;">
+                        <span class="field-label" style="font-size: 16px; color: #183162;">📚 Enrolled Classes (${data.enrollments.length}):</span>
+                        <span class="field-value"></span>
+                    </div>
+                `;
+
+                data.enrollments.forEach(enrollment => {
+                    const className = enrollment.className || 'Unknown Class';
+                    const classCode = enrollment.classCode || '';
+                    const subjects = enrollment.subjects ? (Array.isArray(enrollment.subjects) ? enrollment.subjects.join(', ') : enrollment.subjects) : '';
+                    const status = enrollment.status || 'active';
+                    const statusColor = status === 'active' ? '#15b79e' : '#999';
+
+                    // Build class details line
+                    let classDetails = `<span style="color: ${statusColor}; font-weight: 600;">${status}</span>`;
+                    if (classCode) {
+                        classDetails += ` | Code: ${classCode}`;
+                    }
+                    if (subjects) {
+                        classDetails += `<br><span style="color: #999;">Subjects: ${subjects}</span>`;
+                    }
+
+                    html += `
+                        <div class="field-row" style="padding-left: 20px; background: #f8f9fa;">
+                            <span class="field-label" style="color: #183162;">${className}</span>
+                            <span class="field-value" style="font-size: 12px;">
+                                ${classDetails}
                             </span>
                         </div>
                     `;
