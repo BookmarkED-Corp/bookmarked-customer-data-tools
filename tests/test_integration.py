@@ -102,7 +102,22 @@ class TestStudentSearch:
         assert student['sourcedId'] == '600604'
         assert 'email' in student
         assert 'grade' in student
-        assert 'campus' in student
+
+        # Verify campuses array exists
+        assert 'campuses' in student
+        assert isinstance(student['campuses'], list)
+
+        # Verify parents array exists
+        assert 'parents' in student
+        assert isinstance(student['parents'], list)
+
+        # Verify siblings array exists
+        assert 'siblings' in student
+        assert isinstance(student['siblings'], list)
+
+        # Verify enrollments array exists
+        assert 'enrollments' in student
+        assert isinstance(student['enrollments'], list)
 
     def test_student_search_not_found(self):
         """Test searching for non-existent student"""
