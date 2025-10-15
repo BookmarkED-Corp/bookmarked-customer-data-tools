@@ -586,6 +586,35 @@
             }
         }
 
+        // Format relative time for student list
+        function formatRelativeTime(dateString) {
+            if (!dateString) return 'Unknown';
+
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffSecs = Math.floor(diffMs / 1000);
+            const diffMins = Math.floor(diffSecs / 60);
+            const diffHours = Math.floor(diffMins / 60);
+            const diffDays = Math.floor(diffHours / 24);
+            const diffMonths = Math.floor(diffDays / 30);
+            const diffYears = Math.floor(diffDays / 365);
+
+            if (diffYears > 0) {
+                return `${diffYears} year${diffYears > 1 ? 's' : ''} ago`;
+            } else if (diffMonths > 0) {
+                return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+            } else if (diffDays > 0) {
+                return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+            } else if (diffHours > 0) {
+                return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            } else if (diffMins > 0) {
+                return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
+            } else {
+                return 'Just now';
+            }
+        }
+
         // Display student selection list
         function displayStudentSelection(students) {
             const studentList = document.getElementById('student-list');
@@ -609,13 +638,29 @@
                 const sourcedId = student.sourcedId || 'No ID';
                 const isDeleted = student.isDeleted ? ' (DELETED)' : '';
 
+                // Data freshness indicator
+                const lastUpdated = formatRelativeTime(student.updatedAt);
+                const freshnessColor = getFreshnessColor(student.updatedAt);
+
+                // Enrollment count
+                const enrollmentCount = student.enrollment_count || 0;
+                const hasEnrollments = enrollmentCount > 0;
+
                 html += `
                     <div class="student-item" onclick="selectStudent(${student.id})">
-                        <h4>${name}${isDeleted}</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                            <h4 style="margin: 0;">${name}${isDeleted}</h4>
+                            <span style="background: ${freshnessColor}; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                                Updated ${lastUpdated}
+                            </span>
+                        </div>
                         <div class="student-details">
                             <span><strong>ID:</strong> ${sourcedId}</span>
                             <span><strong>Grade:</strong> ${grade}</span>
                             <span><strong>Email:</strong> ${email}</span>
+                            <span style="color: ${hasEnrollments ? '#15b79e' : '#999'};">
+                                <strong>📚 Classes:</strong> ${enrollmentCount}
+                            </span>
                         </div>
                     </div>
                 `;
@@ -624,6 +669,23 @@
             studentList.innerHTML = html;
 
             addLog('Student selection list displayed', { count: students.length }, 'success');
+        }
+
+        // Get color based on data freshness
+        function getFreshnessColor(dateString) {
+            if (!dateString) return '#999';
+
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+
+            if (diffDays <= 7) {
+                return '#15b79e'; // Green - very fresh
+            } else if (diffDays <= 30) {
+                return '#ff6227'; // Orange - moderate
+            } else {
+                return '#999'; // Gray - stale
+            }
         }
 
         // Select a student from the list

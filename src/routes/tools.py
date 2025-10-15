@@ -475,6 +475,24 @@ def search_student():
         # If multiple students found, return the list for user to choose
         if len(bookmarked_results) > 1:
             logger.info("Multiple students found", count=len(bookmarked_results))
+
+            # Enrich each student with enrollment count
+            for student in bookmarked_results:
+                try:
+                    enrollment_count_query = """
+                        SELECT COUNT(*) as count
+                        FROM "OneRosterEnrollment" e
+                        WHERE e."userId" = :student_sourced_id
+                        AND e.status = 'active'
+                    """
+                    count_result = db.execute_query(enrollment_count_query, {
+                        'student_sourced_id': student['sourcedId']
+                    })
+                    student['enrollment_count'] = count_result[0]['count'] if count_result else 0
+                except Exception as e:
+                    logger.warning("Failed to get enrollment count", error=str(e))
+                    student['enrollment_count'] = 0
+
             db.disconnect()
             return jsonify({
                 'success': True,
