@@ -819,6 +819,123 @@ def get_parent_details(parent_id):
         }), 500
 
 
+@tools_bp.route('/api/students/<int:student_id>/parents', methods=['GET'])
+def get_student_parents(student_id):
+    """
+    Get all parents for a specific student
+
+    Query params:
+        district_id: District ID
+        environment: 'staging' or 'production'
+    """
+    district_id = request.args.get('district_id', type=int)
+    environment = request.args.get('environment', 'staging')
+
+    if not district_id:
+        return jsonify({
+            'success': False,
+            'message': 'Missing district_id'
+        }), 400
+
+    try:
+        # Load configuration
+        from src.utils.connections import ConnectionsConfig
+        config_manager = ConnectionsConfig()
+        defaults = config_manager.load_defaults()
+
+        if not defaults or environment not in defaults:
+            return jsonify({
+                'success': False,
+                'message': f'No {environment} configuration found'
+            }), 400
+
+        env_config = defaults[environment]
+
+        # Connect to database
+        db = BookmarkedDBConnector(environment=environment)
+
+        if 'db' in env_config:
+            db_config = env_config['db']
+        else:
+            db_config = env_config
+
+        connected = db.connect(
+            host=db_config.get('host'),
+            port=db_config.get('port', 5432),
+            database=db_config.get('database'),
+            user=db_config.get('user'),
+            password=db_config.get('password')
+        )
+
+        if not connected:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to connect to database'
+            }), 500
+
+        # Get all parents for this student
+        parents_query = """
+            SELECT
+                p.id,
+                p."sourcedId",
+                p."givenName",
+                p."familyName",
+                p.email,
+                p.phone,
+                p."createdAt",
+                p."updatedAt"
+            FROM "_ParentToStudent" ps
+            JOIN "Parent" p ON ps."A" = p.id
+            WHERE ps."B" = :student_id
+            ORDER BY p."familyName", p."givenName"
+        """
+
+        parents = db.execute_query(parents_query, {'student_id': student_id})
+
+        # Convert dates
+        for parent in parents:
+            for key in ['createdAt', 'updatedAt']:
+                if key in parent and parent[key]:
+                    parent[key] = str(parent[key])
+
+            # Get children for each parent
+            children_query = """
+                SELECT
+                    s.id,
+                    s."sourcedId",
+                    s."givenName",
+                    s."familyName",
+                    s.email,
+                    s.grade
+                FROM "_ParentToStudent" ps
+                JOIN "Student" s ON ps."B" = s.id
+                WHERE ps."A" = :parent_id
+                ORDER BY s.grade DESC, s."familyName", s."givenName"
+            """
+            children = db.execute_query(children_query, {'parent_id': parent['id']})
+            parent['children'] = children
+
+        db.disconnect()
+
+        logger.info("Parents retrieved for student",
+                   student_id=student_id,
+                   count=len(parents))
+
+        return jsonify({
+            'success': True,
+            'parents': parents
+        })
+
+    except Exception as e:
+        logger.error("Error fetching parents for student",
+                    student_id=student_id,
+                    error=str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 @tools_bp.route('/api/students/search', methods=['POST'])
 def search_student():
     """
