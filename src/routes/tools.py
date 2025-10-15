@@ -346,7 +346,7 @@ def search_student():
                         cd."districtId",
                         ca."onerosterApplicationId"
                     FROM "ClasslinkDistrict" cd
-                    LEFT JOIN "ClasslinkApplication" ca ON cd."applicationId" = ca.id
+                    LEFT JOIN "ClasslinkApplication" ca ON cd."classlinkApplicationId" = ca.id
                     WHERE cd."districtId" = :district_id
                     LIMIT 1
                 """
