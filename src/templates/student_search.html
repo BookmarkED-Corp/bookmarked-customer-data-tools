@@ -299,6 +299,41 @@
         .toggle-log:hover {
             background: #2d2d2d;
         }
+
+        .student-item {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .student-item:hover {
+            border-color: #183162;
+            background: #f8f9fa;
+            transform: translateX(5px);
+        }
+
+        .student-item h4 {
+            color: #183162;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+
+        .student-item .student-details {
+            display: flex;
+            gap: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .student-item .student-details span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
     </style>
 </head>
 <body>
@@ -338,6 +373,13 @@
             <!-- No Results -->
             <div id="no-results" class="no-results" style="display:none;">
                 No student found matching your search criteria.
+            </div>
+
+            <!-- Multiple Matches Selection -->
+            <div id="multiple-matches" class="search-section" style="display:none;">
+                <h3>Multiple Students Found (<span id="match-count">0</span>)</h3>
+                <p style="color: #666; margin-bottom: 15px;">Please select the correct student from the list below:</p>
+                <div id="student-list" style="max-height: 400px; overflow-y: auto;"></div>
             </div>
 
             <!-- Side-by-Side Comparison -->
@@ -493,7 +535,11 @@
 
                 document.getElementById('loading').style.display = 'none';
 
-                if (result.success && result.student) {
+                if (result.success && result.multiple_matches) {
+                    // Multiple students found - show selection list
+                    addLog(`Multiple students found: ${result.count}`, null, 'info');
+                    displayStudentSelection(result.students);
+                } else if (result.success && result.student) {
                     addLog('Student found, displaying comparison', null, 'success');
                     currentResults = result;
                     displayComparison(result);
@@ -505,6 +551,79 @@
                 document.getElementById('loading').style.display = 'none';
                 addLog('API request failed with exception', { error: error.message, stack: error.stack }, 'error');
                 alert('Error searching student: ' + error.message);
+            }
+        }
+
+        // Display student selection list
+        function displayStudentSelection(students) {
+            const studentList = document.getElementById('student-list');
+            const matchCount = document.getElementById('match-count');
+
+            // Hide other sections
+            document.getElementById('comparison').classList.remove('show');
+            document.getElementById('no-results').style.display = 'none';
+            document.getElementById('export-btn').style.display = 'none';
+
+            // Show multiple matches section
+            document.getElementById('multiple-matches').style.display = 'block';
+            matchCount.textContent = students.length;
+
+            // Build student list
+            let html = '';
+            students.forEach(student => {
+                const name = `${student.givenName || ''} ${student.familyName || ''}`.trim() || 'Unknown';
+                const email = student.email || 'No email';
+                const grade = student.grade || 'N/A';
+                const sourcedId = student.sourcedId || 'No ID';
+                const isDeleted = student.isDeleted ? ' (DELETED)' : '';
+
+                html += `
+                    <div class="student-item" onclick="selectStudent(${student.id})">
+                        <h4>${name}${isDeleted}</h4>
+                        <div class="student-details">
+                            <span><strong>ID:</strong> ${sourcedId}</span>
+                            <span><strong>Grade:</strong> ${grade}</span>
+                            <span><strong>Email:</strong> ${email}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            studentList.innerHTML = html;
+
+            addLog('Student selection list displayed', { count: students.length }, 'success');
+        }
+
+        // Select a student from the list
+        async function selectStudent(studentId) {
+            addLog('Student selected', { studentId });
+
+            // Hide selection list
+            document.getElementById('multiple-matches').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                const response = await fetch(
+                    `/api/students/${studentId}?district_id=${selectedDistrictId}&environment=${selectedEnvironment}`
+                );
+
+                const result = await response.json();
+
+                addLog('Received student details', result, response.ok ? 'success' : 'error');
+
+                document.getElementById('loading').style.display = 'none';
+
+                if (result.success && result.student) {
+                    currentResults = result;
+                    displayComparison(result);
+                } else {
+                    addLog('Failed to fetch student details', { message: result.message }, 'error');
+                    alert('Failed to fetch student details: ' + (result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                addLog('API request failed', { error: error.message }, 'error');
+                alert('Error fetching student details: ' + error.message);
             }
         }
 

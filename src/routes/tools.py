@@ -202,6 +202,184 @@ def check_classlink_data(district_id):
         }), 500
 
 
+@tools_bp.route('/api/students/<int:student_id>', methods=['GET'])
+def get_student_details(student_id):
+    """
+    Get detailed information for a specific student by ID
+
+    Query params:
+        district_id: District ID
+        environment: 'staging' or 'production'
+    """
+    district_id = request.args.get('district_id', type=int)
+    environment = request.args.get('environment', 'staging')
+
+    if not district_id:
+        return jsonify({
+            'success': False,
+            'message': 'Missing district_id'
+        }), 400
+
+    try:
+        # Load configuration
+        from src.utils.connections import ConnectionsConfig
+        config_manager = ConnectionsConfig()
+        defaults = config_manager.load_defaults()
+
+        if not defaults or environment not in defaults:
+            return jsonify({
+                'success': False,
+                'message': f'No {environment} configuration found'
+            }), 400
+
+        env_config = defaults[environment]
+
+        # Connect to database
+        db = BookmarkedDBConnector(environment=environment)
+
+        if 'db' in env_config:
+            db_config = env_config['db']
+        else:
+            db_config = env_config
+
+        connected = db.connect(
+            host=db_config.get('host'),
+            port=db_config.get('port', 5432),
+            database=db_config.get('database'),
+            user=db_config.get('user'),
+            password=db_config.get('password')
+        )
+
+        if not connected:
+            return jsonify({
+                'success': False,
+                'message': 'Failed to connect to database'
+            }), 500
+
+        # Get student by ID
+        student_query = """
+            SELECT
+                s.id,
+                s."sourcedId",
+                s."givenName",
+                s."familyName",
+                s.email,
+                s.grade,
+                s."isDeleted",
+                s."createdAt",
+                s."updatedAt"
+            FROM "Student" s
+            WHERE s.id = :student_id
+        """
+
+        students = db.execute_query(student_query, {'student_id': student_id})
+
+        if not students:
+            db.disconnect()
+            return jsonify({
+                'success': False,
+                'message': 'Student not found'
+            }), 404
+
+        bookmarked_data = students[0]
+
+        # Fetch all related data (same as search_student below)
+        # Get campuses
+        campus_query = """
+            SELECT
+                c.id,
+                c.name,
+                c."districtId"
+            FROM "_CampusToStudent" cs
+            JOIN "Campus" c ON cs."A" = c.id
+            WHERE cs."B" = :student_id
+            ORDER BY c.name
+        """
+        campuses = db.execute_query(campus_query, {'student_id': student_id})
+        bookmarked_data['campuses'] = campuses
+
+        # Get parents
+        parents_query = """
+            SELECT
+                p.id,
+                p.email,
+                p."givenName",
+                p."familyName",
+                p.phone
+            FROM "_ParentToStudent" ps
+            JOIN "Parent" p ON ps."A" = p.id
+            WHERE ps."B" = :student_id
+            ORDER BY p."familyName", p."givenName"
+        """
+        parents = db.execute_query(parents_query, {'student_id': student_id})
+        bookmarked_data['parents'] = parents
+
+        # Get siblings
+        siblings_query = """
+            SELECT DISTINCT
+                s.id,
+                s."sourcedId",
+                s."givenName",
+                s."familyName",
+                s.grade
+            FROM "Student" s
+            JOIN "_ParentToStudent" ps ON s.id = ps."B"
+            WHERE ps."A" IN (
+                SELECT "A" FROM "_ParentToStudent" WHERE "B" = :student_id
+            )
+            AND s.id != :student_id
+            ORDER BY s.grade DESC, s."familyName", s."givenName"
+        """
+        siblings = db.execute_query(siblings_query, {'student_id': student_id})
+        bookmarked_data['siblings'] = siblings
+
+        # Get enrollments
+        enrollments = []
+        try:
+            enrollment_query = """
+                SELECT
+                    e.id,
+                    e."sourcedId",
+                    e.role,
+                    e.status,
+                    e."beginDate",
+                    e."endDate"
+                FROM "OneRosterEnrollment" e
+                WHERE e."userId" = :student_sourced_id
+                ORDER BY e."beginDate" DESC
+                LIMIT 20
+            """
+            enrollments = db.execute_query(enrollment_query, {
+                'student_sourced_id': bookmarked_data['sourcedId']
+            })
+        except Exception as enrollment_error:
+            logger.warning("Failed to retrieve enrollments", error=str(enrollment_error))
+
+        # Convert dates
+        for key in ['createdAt', 'updatedAt']:
+            if key in bookmarked_data and bookmarked_data[key]:
+                bookmarked_data[key] = str(bookmarked_data[key])
+
+        bookmarked_data['enrollments'] = enrollments
+
+        db.disconnect()
+
+        return jsonify({
+            'success': True,
+            'student': True,
+            'bookmarked_data': bookmarked_data
+        })
+
+    except Exception as e:
+        logger.error("Error fetching student details",
+                    student_id=student_id,
+                    error=str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
 @tools_bp.route('/api/students/search', methods=['POST'])
 def search_student():
     """
@@ -262,7 +440,7 @@ def search_student():
             }), 500
 
         # Query student from Bookmarked DB
-        # First find the student
+        # First find the student(s)
         student_query = """
             SELECT DISTINCT
                 s.id,
@@ -285,13 +463,25 @@ def search_student():
                     OR s.email ILIKE :search_term
                     OR CONCAT(s."givenName", ' ', s."familyName") ILIKE :search_term
                 )
-            LIMIT 1
+            ORDER BY s."familyName", s."givenName"
+            LIMIT 50
         """
 
         bookmarked_results = db.execute_query(student_query, {
             'district_id': district_id,
             'search_term': f'%{search_term}%'
         })
+
+        # If multiple students found, return the list for user to choose
+        if len(bookmarked_results) > 1:
+            logger.info("Multiple students found", count=len(bookmarked_results))
+            db.disconnect()
+            return jsonify({
+                'success': True,
+                'multiple_matches': True,
+                'count': len(bookmarked_results),
+                'students': bookmarked_results
+            })
 
         bookmarked_data = bookmarked_results[0] if bookmarked_results else None
 
