@@ -562,7 +562,7 @@ def search_student():
             bookmarked_data['siblings'] = siblings
             logger.info("Siblings retrieved for student", count=len(siblings))
 
-        # Get enrollment data if student found
+        # Get enrollment data with class details if student found
         enrollments = []
         if bookmarked_data:
             try:
@@ -573,11 +573,17 @@ def search_student():
                         e.role,
                         e.status,
                         e."beginDate",
-                        e."endDate"
+                        e."endDate",
+                        e."classSourcedId",
+                        c.title as "className",
+                        c."classCode",
+                        c.subjects
                     FROM "OneRosterEnrollment" e
+                    LEFT JOIN "OneRosterClass" c ON e."classSourcedId" = c."sourcedId"
                     WHERE e."userId" = :student_sourced_id
-                    ORDER BY e."beginDate" DESC
-                    LIMIT 20
+                    AND e.status = 'active'
+                    ORDER BY c.title
+                    LIMIT 50
                 """
                 enrollments = db.execute_query(enrollment_query, {
                     'student_sourced_id': bookmarked_data['sourcedId']
