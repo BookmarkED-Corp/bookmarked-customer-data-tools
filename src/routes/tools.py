@@ -647,46 +647,173 @@ def search_parent():
 
         parent_data = parent_results[0] if parent_results else None
 
-        if not parent_data:
-            db.disconnect()
-            return jsonify({
-                'success': False,
-                'message': 'No parent found in Bookmarked database',
-                'parent': False
-            }), 404
+        # If parent found in Bookmarked, get children
+        if parent_data:
+            # Get all children for this parent
+            children_query = """
+                SELECT
+                    s.id,
+                    s."sourcedId",
+                    s."givenName",
+                    s."familyName",
+                    s.email,
+                    s.grade
+                FROM "_ParentToStudent" ps
+                JOIN "Student" s ON ps."B" = s.id
+                WHERE ps."A" = :parent_id
+                ORDER BY s.grade DESC, s."familyName", s."givenName"
+            """
+            children = db.execute_query(children_query, {
+                'parent_id': parent_data['id']
+            })
+            parent_data['children'] = children
+            logger.info("Children retrieved for parent", count=len(children))
 
-        # Get all children for this parent
-        children_query = """
-            SELECT
-                s.id,
-                s."sourcedId",
-                s."givenName",
-                s."familyName",
-                s.email,
-                s.grade
-            FROM "_ParentToStudent" ps
-            JOIN "Student" s ON ps."B" = s.id
-            WHERE ps."A" = :parent_id
-            ORDER BY s.grade DESC, s."familyName", s."givenName"
-        """
-        children = db.execute_query(children_query, {
-            'parent_id': parent_data['id']
-        })
-        parent_data['children'] = children
-        logger.info("Children retrieved for parent", count=len(children))
+            # Convert date objects to strings
+            for key in ['createdAt', 'updatedAt']:
+                if key in parent_data and parent_data[key]:
+                    parent_data[key] = str(parent_data[key])
 
         db.disconnect()
 
-        # Convert date objects to strings
-        for key in ['createdAt', 'updatedAt']:
-            if key in parent_data and parent_data[key]:
-                parent_data[key] = str(parent_data[key])
+        # 2. Search in ClassLink snapshots (regardless of Bookmarked result)
+        classlink_data = None
+        classlink_error_message = None
 
-        return jsonify({
-            'success': True,
-            'parent': True,
-            'bookmarked_data': parent_data
-        })
+        logger.info("Attempting ClassLink parent search",
+                   district_id=district_id,
+                   has_classlink_config='classlink' in defaults)
+
+        if 'classlink' in defaults and defaults['classlink'].get('api_key'):
+            logger.info("ClassLink configuration found, starting snapshot search")
+            try:
+                # Check if district has ClassLink integration
+                classlink_query = """
+                    SELECT
+                        cd.id,
+                        cd."sourcedId",
+                        cd.name,
+                        cd."lastSync",
+                        cd."districtId",
+                        ca.oneroster_application_id
+                    FROM "ClasslinkDistrict" cd
+                    LEFT JOIN "ClasslinkApplication" ca ON cd."classlinkApplicationId" = ca.id
+                    WHERE cd."districtId" = :district_id
+                    LIMIT 1
+                """
+
+                db_cl = BookmarkedDBConnector(environment=environment)
+                connected_cl = db_cl.connect(
+                    host=db_config.get('host'),
+                    port=db_config.get('port', 5432),
+                    database=db_config.get('database'),
+                    user=db_config.get('user'),
+                    password=db_config.get('password')
+                )
+
+                if connected_cl:
+                    classlink_district = db_cl.execute_query(classlink_query, {'district_id': district_id})
+                    db_cl.disconnect()
+
+                    if classlink_district and len(classlink_district) > 0:
+                        oneroster_app_id = classlink_district[0].get('oneroster_application_id')
+
+                        if oneroster_app_id:
+                            # Try to use snapshot data
+                            from src.snapshots.snapshot_manager import SnapshotManager
+                            from datetime import datetime
+
+                            snapshot_manager = SnapshotManager()
+                            today = datetime.now().strftime('%Y-%m-%d')
+
+                            # Check if today's snapshot exists
+                            snapshot = snapshot_manager.get_snapshot(district_id, today, 'classlink')
+
+                            if snapshot and snapshot.get('status') == 'complete':
+                                # Use snapshot data
+                                logger.info("Using ClassLink snapshot for parent search",
+                                           district_id=district_id,
+                                           date=today)
+
+                                parents = snapshot_manager.search_snapshot(
+                                    district_id=district_id,
+                                    date=today,
+                                    source_type='classlink',
+                                    entity_type='parents',
+                                    search_term=search_term
+                                )
+
+                                if parents:
+                                    matched_parent = parents[0]
+
+                                    # Get children from JSONL using agents array
+                                    children = snapshot_manager.get_parent_children_from_jsonl(
+                                        district_id=district_id,
+                                        date=today,
+                                        source_type='classlink',
+                                        parent_sourced_id=matched_parent.get('sourcedId')
+                                    )
+
+                                    classlink_data = {
+                                        'sourcedId': matched_parent.get('sourcedId'),
+                                        'givenName': matched_parent.get('givenName'),
+                                        'familyName': matched_parent.get('familyName'),
+                                        'email': matched_parent.get('email'),
+                                        'phone': matched_parent.get('phone') or matched_parent.get('sms'),
+                                        'role': matched_parent.get('role'),
+                                        'status': matched_parent.get('status'),
+                                        'children': children
+                                    }
+
+                                    logger.info("ClassLink parent found in snapshot",
+                                               sourcedId=matched_parent.get('sourcedId'),
+                                               children_count=len(children),
+                                               from_snapshot=True)
+                                else:
+                                    classlink_error_message = 'No matching parent found in ClassLink snapshot'
+                                    logger.info("No ClassLink parent match in snapshot",
+                                               search_term=search_term)
+                            else:
+                                classlink_error_message = 'No ClassLink snapshot available for today'
+                                logger.info("No snapshot available for parent search",
+                                           district_id=district_id)
+                        else:
+                            classlink_error_message = 'District has ClassLink but no OneRoster application ID'
+                    else:
+                        classlink_error_message = 'District does not have ClassLink integration'
+
+            except Exception as classlink_error:
+                classlink_error_message = str(classlink_error)
+                logger.error("ClassLink parent search failed",
+                            district_id=district_id,
+                            error=str(classlink_error))
+
+        # Return appropriate response with both sources
+        if parent_data or classlink_data:
+            response = {
+                'success': True,
+                'parent': True,
+                'bookmarked_data': parent_data,
+                'classlink_data': classlink_data
+            }
+
+            # Add informative message
+            if parent_data and classlink_data:
+                response['message'] = 'Parent found in both Bookmarked and ClassLink'
+            elif parent_data:
+                response['message'] = 'Parent found in Bookmarked only'
+                response['classlink_error'] = classlink_error_message
+            elif classlink_data:
+                response['message'] = 'Parent found in ClassLink only'
+
+            return jsonify(response)
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No parent found in Bookmarked database or ClassLink',
+                'parent': False,
+                'classlink_error': classlink_error_message
+            }), 404
 
     except Exception as e:
         logger.error("Error searching parent",
@@ -1198,45 +1325,83 @@ def search_student():
                         oneroster_app_id = classlink_district[0].get('oneroster_application_id')
 
                         if oneroster_app_id:
-                            # Initialize ClassLink connector
-                            classlink = ClassLinkConnector()
-                            api_key = defaults['classlink']['api_key']
+                            # Try to use snapshot data first, fall back to live API
+                            from src.snapshots.snapshot_manager import SnapshotManager
+                            from datetime import datetime
 
-                            # Fetch all users (students AND parents) from ClassLink
-                            # This allows us to match parents using the agents array
-                            all_users = classlink.get_users(
-                                bearer_token=api_key,
-                                oneroster_app_id=oneroster_app_id,
-                                limit=500  # Get more users to include parents
-                            )
+                            snapshot_manager = SnapshotManager()
+                            today = datetime.now().strftime('%Y-%m-%d')
 
-                            # Separate students and parents
-                            students = [u for u in all_users if u.get('role') == 'student']
-                            parents_and_guardians = [u for u in all_users if u.get('role') in ['parent', 'guardian']]
+                            # Check if today's snapshot exists
+                            snapshot = snapshot_manager.get_snapshot(district_id, today, 'classlink')
 
-                            # Filter students by search term
-                            matched_student = None
-                            for student in students:
-                                student_id = student.get('sourcedId', '')
-                                given_name = student.get('givenName', '')
-                                family_name = student.get('familyName', '')
-                                email = student.get('email', '')
+                            students = []
+                            parents_and_guardians = []
 
-                                # Case-insensitive search
-                                search_lower = search_term.lower()
-                                full_name = f"{given_name} {family_name}".lower()
+                            if snapshot and snapshot.get('status') == 'complete':
+                                # Use snapshot data
+                                logger.info("Using ClassLink snapshot for search",
+                                           district_id=district_id,
+                                           date=today)
 
-                                if (search_lower in student_id.lower() or
-                                    search_lower in given_name.lower() or
-                                    search_lower in family_name.lower() or
-                                    search_lower in email.lower() or
-                                    search_lower in full_name):
+                                students = snapshot_manager.search_snapshot(
+                                    district_id=district_id,
+                                    date=today,
+                                    source_type='classlink',
+                                    entity_type='students',
+                                    search_term=search_term
+                                )
 
-                                    matched_student = student
-                                    logger.info("ClassLink student found",
-                                               sourcedId=student.get('sourcedId'),
-                                               oneroster_app_id=oneroster_app_id)
-                                    break
+                                # Get all parents for matching
+                                parents_and_guardians = snapshot_manager.search_snapshot(
+                                    district_id=district_id,
+                                    date=today,
+                                    source_type='classlink',
+                                    entity_type='parents',
+                                    search_term=''  # Get all parents
+                                )
+
+                                logger.info("Snapshot search completed",
+                                           students_found=len(students),
+                                           parents_loaded=len(parents_and_guardians))
+                            else:
+                                # Fall back to live API
+                                logger.info("No snapshot available, using live ClassLink API",
+                                           district_id=district_id)
+
+                                classlink = ClassLinkConnector()
+                                api_key = defaults['classlink']['api_key']
+
+                                # Fetch all users (students AND parents) from ClassLink
+                                all_users = classlink.get_users(
+                                    bearer_token=api_key,
+                                    oneroster_app_id=oneroster_app_id,
+                                    limit=500
+                                )
+
+                                # Separate students and parents
+                                all_students = [u for u in all_users if u.get('role') == 'student']
+                                parents_and_guardians = [u for u in all_users if u.get('role') in ['parent', 'guardian']]
+
+                                # Filter by search term
+                                for student in all_students:
+                                    student_id = student.get('sourcedId', '')
+                                    given_name = student.get('givenName', '')
+                                    family_name = student.get('familyName', '')
+                                    email = student.get('email', '')
+
+                                    search_lower = search_term.lower()
+                                    full_name = f"{given_name} {family_name}".lower()
+
+                                    if (search_lower in student_id.lower() or
+                                        search_lower in given_name.lower() or
+                                        search_lower in family_name.lower() or
+                                        search_lower in email.lower() or
+                                        search_lower in full_name):
+                                        students.append(student)
+
+                            # Process matched students
+                            matched_student = students[0] if students else None
 
                             # If student found, build response with parent matching
                             if matched_student:
@@ -1245,7 +1410,7 @@ def search_student():
                                     'givenName': matched_student.get('givenName'),
                                     'familyName': matched_student.get('familyName'),
                                     'email': matched_student.get('email'),
-                                    'grade': matched_student.get('grades', [''])[0] if matched_student.get('grades') else None,
+                                    'grade': matched_student.get('grade') or (matched_student.get('grades', [''])[0] if matched_student.get('grades') else None),
                                     'status': matched_student.get('status'),
                                     'identifier': matched_student.get('identifier'),
                                     'metadata': matched_student.get('metadata'),
@@ -1253,8 +1418,8 @@ def search_student():
                                     'parents': []
                                 }
 
-                                # Match parents using agents array
-                                # In OneRoster, student.agents contains parent sourcedIds
+                                # Match parents using agents array (live API) or identifier (snapshot)
+                                # Note: Snapshot doesn't have agents, need to match by student identifier
                                 agents = matched_student.get('agents', [])
                                 if agents:
                                     parent_sourceids = [agent.get('sourcedId') for agent in agents if agent.get('type') in ['Parent', 'Guardian', 'parent', 'guardian']]
@@ -1275,6 +1440,10 @@ def search_student():
                                     logger.info("ClassLink parents matched",
                                                student_sourcedId=matched_student.get('sourcedId'),
                                                parent_count=len(classlink_data['parents']))
+
+                                logger.info("ClassLink student found",
+                                           sourcedId=matched_student.get('sourcedId'),
+                                           from_snapshot=snapshot is not None)
                             else:
                                 classlink_data = None
 
@@ -1385,6 +1554,243 @@ def search_student():
                     search_term=search_term,
                     district_id=district_id,
                     error=str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+# ====================
+# SNAPSHOT API ROUTES
+# ====================
+
+@tools_bp.route('/api/snapshots/<int:district_id>/status', methods=['GET'])
+def get_snapshot_status(district_id):
+    """
+    Get snapshot status for a district
+
+    Query params:
+        source_type: 'classlink' or 'oneroster'
+        date: Snapshot date (YYYY-MM-DD), defaults to today
+    """
+    from datetime import datetime
+
+    source_type = request.args.get('source_type', 'classlink')
+    date = request.args.get('date', datetime.now().strftime('%Y-%m-%d'))
+
+    try:
+        from src.snapshots.snapshot_manager import SnapshotManager
+
+        snapshot_manager = SnapshotManager()
+
+        # Check if snapshot exists
+        snapshot = snapshot_manager.get_snapshot(district_id, date, source_type)
+
+        if snapshot:
+            logger.info("Snapshot status retrieved",
+                       district_id=district_id,
+                       date=date,
+                       source_type=source_type,
+                       status=snapshot.get('status'))
+
+            return jsonify({
+                'success': True,
+                'snapshot': snapshot,
+                'exists': True
+            })
+        else:
+            # Try to get latest snapshot
+            latest_snapshot = snapshot_manager.get_latest_snapshot(district_id, source_type)
+
+            if latest_snapshot:
+                logger.info("Latest snapshot found",
+                           district_id=district_id,
+                           date=latest_snapshot.get('snapshot_date'),
+                           source_type=source_type)
+
+                return jsonify({
+                    'success': True,
+                    'snapshot': latest_snapshot,
+                    'exists': True,
+                    'is_latest': False
+                })
+            else:
+                logger.info("No snapshot found",
+                           district_id=district_id,
+                           source_type=source_type)
+
+                return jsonify({
+                    'success': True,
+                    'snapshot': None,
+                    'exists': False
+                })
+
+    except Exception as e:
+        logger.error("Error getting snapshot status",
+                    district_id=district_id,
+                    error=str(e))
+        return jsonify({
+            'success': False,
+            'message': str(e)
+        }), 500
+
+
+@tools_bp.route('/api/snapshots/<int:district_id>/refresh', methods=['POST'])
+def refresh_snapshot(district_id):
+    """
+    Trigger snapshot refresh for a district
+
+    Request body:
+        source_type: 'classlink' or 'oneroster'
+        force: Force refresh even if today's snapshot exists
+        environment: 'staging' or 'production'
+    """
+    from datetime import datetime
+    import uuid
+
+    data = request.json or {}
+    source_type = data.get('source_type', 'classlink')
+    force = data.get('force', False)
+    environment = data.get('environment', 'production')
+
+    try:
+        from src.snapshots.snapshot_manager import SnapshotManager
+        from src.snapshots.classlink_fetcher import ClassLinkSnapshotFetcher
+
+        snapshot_manager = SnapshotManager()
+        today = datetime.now().strftime('%Y-%m-%d')
+
+        # Check if snapshot already exists for today
+        if not force:
+            existing = snapshot_manager.get_snapshot(district_id, today, source_type)
+            if existing and existing.get('status') == 'complete':
+                logger.info("Snapshot already exists for today",
+                           district_id=district_id,
+                           date=today,
+                           source_type=source_type)
+                return jsonify({
+                    'success': False,
+                    'message': 'Snapshot already exists for today. Use force=true to overwrite.',
+                    'snapshot': existing
+                }), 400
+
+        # Check if snapshot is currently being fetched
+        if snapshot_manager.is_snapshot_in_progress(district_id, today, source_type):
+            logger.warning("Snapshot fetch already in progress",
+                          district_id=district_id,
+                          date=today,
+                          source_type=source_type)
+            return jsonify({
+                'success': False,
+                'message': 'Snapshot fetch is already in progress for today. Please wait.'
+            }), 409
+
+        # Get ClassLink credentials
+        from src.utils.connections import ConnectionsConfig
+        config_manager = ConnectionsConfig()
+        defaults = config_manager.load_defaults()
+
+        if source_type == 'classlink':
+            if 'classlink' not in defaults or not defaults['classlink'].get('api_key'):
+                return jsonify({
+                    'success': False,
+                    'message': 'ClassLink API key not configured'
+                }), 400
+
+            # Get OneRoster app ID for district
+            env_config = get_environment_config(environment)
+
+            if not env_config:
+                return jsonify({
+                    'success': False,
+                    'message': f'No configuration found for environment: {environment}'
+                }), 400
+
+            db = BookmarkedDBConnector(environment=environment)
+
+            if 'db' in env_config:
+                db_config = env_config['db']
+            else:
+                db_config = env_config
+
+            connected = db.connect(
+                host=db_config.get('host'),
+                port=db_config.get('port', 5432),
+                database=db_config.get('database'),
+                user=db_config.get('user'),
+                password=db_config.get('password')
+            )
+
+            if not connected:
+                return jsonify({
+                    'success': False,
+                    'message': 'Failed to connect to database'
+                }), 500
+
+            # Get ClassLink application ID
+            classlink_query = """
+                SELECT
+                    cd.id,
+                    ca.oneroster_application_id
+                FROM "ClasslinkDistrict" cd
+                LEFT JOIN "ClasslinkApplication" ca ON cd."classlinkApplicationId" = ca.id
+                WHERE cd."districtId" = :district_id
+                LIMIT 1
+            """
+
+            classlink_district = db.execute_query(classlink_query, {'district_id': district_id})
+            db.disconnect()
+
+            if not classlink_district or len(classlink_district) == 0:
+                return jsonify({
+                    'success': False,
+                    'message': 'District does not have ClassLink integration'
+                }), 400
+
+            oneroster_app_id = classlink_district[0].get('oneroster_application_id')
+
+            if not oneroster_app_id:
+                return jsonify({
+                    'success': False,
+                    'message': 'District has ClassLink but no OneRoster application ID'
+                }), 400
+
+            # Start snapshot fetch in background
+            session_id = str(uuid.uuid4())
+            bearer_token = defaults['classlink']['api_key']
+
+            fetcher = ClassLinkSnapshotFetcher(snapshot_manager)
+            fetcher.create_snapshot_async(
+                district_id=district_id,
+                bearer_token=bearer_token,
+                oneroster_app_id=oneroster_app_id,
+                session_id=session_id,
+                date=today
+            )
+
+            logger.info("Snapshot refresh started",
+                       district_id=district_id,
+                       source_type=source_type,
+                       session_id=session_id)
+
+            return jsonify({
+                'success': True,
+                'message': 'Snapshot refresh started',
+                'session_id': session_id,
+                'date': today
+            })
+
+        else:
+            return jsonify({
+                'success': False,
+                'message': f'Unsupported source type: {source_type}'
+            }), 400
+
+    except Exception as e:
+        logger.error("Error refreshing snapshot",
+                    district_id=district_id,
+                    error=str(e),
+                    exc_info=True)
         return jsonify({
             'success': False,
             'message': str(e)

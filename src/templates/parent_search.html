@@ -334,6 +334,148 @@
             align-items: center;
             gap: 5px;
         }
+
+        .snapshot-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .snapshot-badge.green {
+            background: #d4edda;
+            color: #155724;
+            border-left: 4px solid #15b79e;
+        }
+
+        .snapshot-badge.yellow {
+            background: #fff3cd;
+            color: #856404;
+            border-left: 4px solid #ffa726;
+        }
+
+        .snapshot-badge.red {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #ff6227;
+        }
+
+        .snapshot-badge.fetching {
+            background: #d1ecf1;
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .snapshot-badge.failed {
+            background: #f8d7da;
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .btn-refresh-snapshot {
+            background: #17a2b8;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-left: 8px;
+        }
+
+        .btn-refresh-snapshot:hover {
+            background: #138496;
+        }
+
+        .btn-refresh-snapshot:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #0c5460;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 500px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-dialog h3 {
+            margin-bottom: 15px;
+            color: #183162;
+        }
+
+        .modal-dialog p {
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .btn-modal {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-modal.cancel {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-modal.confirm {
+            background: #ff6227;
+            color: white;
+        }
+
+        .btn-modal.cancel:hover {
+            background: #d0d0d0;
+        }
+
+        .btn-modal.confirm:hover {
+            background: #e5551f;
+        }
     </style>
 </head>
 <body>
@@ -351,6 +493,7 @@
                 <strong>Selected District:</strong> <span id="current-district">--</span> (ID: <span id="current-district-id">--</span>)<br>
                 <strong>Environment:</strong> <span id="current-environment">--</span><br>
                 <div id="classlink-sync-status" style="margin-top: 10px;"></div>
+                <div id="snapshot-status" style="margin-top: 10px;"></div>
                 <a href="/tools" style="color: #0c5460; font-weight: 600; text-decoration: underline;">Change District</a>
             </div>
 
@@ -549,6 +692,9 @@
 
             // Fetch ClassLink sync status for this district
             fetchClassLinkSyncStatus();
+
+            // Fetch snapshot status
+            fetchSnapshotStatus();
         }
 
         // Fetch and display ClassLink sync status
@@ -626,6 +772,207 @@
                     <span style="color: #666; font-size: 12px; margin-left: 8px;">(${syncDateFormat})</span>
                 </div>
             `;
+        }
+
+        // Snapshot status polling
+        let snapshotPollingInterval = null;
+        let currentSnapshotSession = null;
+
+        // Fetch snapshot status
+        async function fetchSnapshotStatus() {
+            try {
+                addLog('Fetching snapshot status', { district_id: selectedDistrictId });
+
+                const response = await fetch(`/api/snapshots/${selectedDistrictId}/status?source_type=classlink`);
+
+                if (!response.ok) {
+                    addLog('Failed to fetch snapshot status', { status: response.status }, 'error');
+                    return;
+                }
+
+                const data = await response.json();
+                addLog('Snapshot status received', data, 'success');
+
+                if (data.success && data.snapshot) {
+                    displaySnapshotStatus(data.snapshot);
+
+                    // If snapshot is fetching, start polling
+                    if (data.snapshot.status === 'fetching') {
+                        startSnapshotPolling();
+                    } else {
+                        stopSnapshotPolling();
+                    }
+                } else {
+                    // No snapshot exists yet
+                    displaySnapshotStatus(null);
+                }
+            } catch (error) {
+                addLog('Error fetching snapshot status', { error: error.message }, 'error');
+            }
+        }
+
+        // Display snapshot status
+        function displaySnapshotStatus(snapshot) {
+            const statusDiv = document.getElementById('snapshot-status');
+
+            if (!snapshot) {
+                // No snapshot available
+                statusDiv.innerHTML = `
+                    <div class="snapshot-badge yellow">
+                        <span>📸 No ClassLink snapshot available</span>
+                        <button class="btn-refresh-snapshot" onclick="showRefreshModal()">Create Snapshot</button>
+                    </div>
+                `;
+                return;
+            }
+
+            const snapshotDate = new Date(snapshot.snapshot_date);
+            const now = new Date();
+            const diffMs = now - snapshotDate;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+            let badgeClass = 'green';
+            let ageText = '';
+
+            if (snapshot.status === 'fetching') {
+                badgeClass = 'fetching';
+                const startedAt = new Date(snapshot.started_at);
+                const fetchingMinutes = Math.floor((now - startedAt) / (1000 * 60));
+                ageText = `Creating snapshot (${fetchingMinutes} min elapsed)`;
+
+                statusDiv.innerHTML = `
+                    <div class="snapshot-badge ${badgeClass}">
+                        <div class="spinner"></div>
+                        <span>📸 ${ageText}</span>
+                    </div>
+                `;
+            } else if (snapshot.status === 'failed') {
+                badgeClass = 'failed';
+                ageText = 'Snapshot failed';
+
+                const errorMsg = snapshot.fetch_stats?.errors?.[0]?.message || 'Unknown error';
+
+                statusDiv.innerHTML = `
+                    <div class="snapshot-badge ${badgeClass}">
+                        <span>⚠️ ${ageText}: ${errorMsg}</span>
+                        <button class="btn-refresh-snapshot" onclick="showRefreshModal()">Retry</button>
+                    </div>
+                `;
+            } else {
+                // Completed snapshot - determine age color
+                if (diffDays > 7) {
+                    badgeClass = 'red';
+                } else if (diffDays > 1) {
+                    badgeClass = 'yellow';
+                }
+
+                if (diffDays > 0) {
+                    ageText = `Snapshot: ${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                } else if (diffHours > 0) {
+                    ageText = `Snapshot: ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                } else {
+                    ageText = 'Snapshot: Less than 1 hour ago';
+                }
+
+                // Count total records
+                const totalRecords = Object.values(snapshot.files || {}).reduce((sum, file) => sum + (file.rows || 0), 0);
+
+                statusDiv.innerHTML = `
+                    <div class="snapshot-badge ${badgeClass}">
+                        <span>📸 ${ageText} (${totalRecords.toLocaleString()} records)</span>
+                        <button class="btn-refresh-snapshot" onclick="showRefreshModal()">Refresh</button>
+                    </div>
+                `;
+            }
+        }
+
+        // Start polling for snapshot status
+        function startSnapshotPolling() {
+            if (snapshotPollingInterval) return; // Already polling
+
+            addLog('Starting snapshot status polling (every 5 seconds)');
+
+            snapshotPollingInterval = setInterval(() => {
+                fetchSnapshotStatus();
+            }, 5000); // Poll every 5 seconds
+        }
+
+        // Stop polling
+        function stopSnapshotPolling() {
+            if (snapshotPollingInterval) {
+                clearInterval(snapshotPollingInterval);
+                snapshotPollingInterval = null;
+                addLog('Stopped snapshot status polling');
+            }
+        }
+
+        // Show refresh confirmation modal
+        function showRefreshModal() {
+            document.getElementById('refresh-modal').classList.add('show');
+            addLog('Showing snapshot refresh confirmation modal');
+        }
+
+        // Close refresh modal
+        function closeRefreshModal() {
+            document.getElementById('refresh-modal').classList.remove('show');
+            addLog('Closed snapshot refresh confirmation modal');
+        }
+
+        // Confirm and trigger snapshot refresh
+        async function confirmRefreshSnapshot() {
+            closeRefreshModal();
+
+            addLog('User confirmed snapshot refresh');
+
+            try {
+                const requestBody = {
+                    source_type: 'classlink',
+                    environment: selectedEnvironment
+                };
+
+                addLog('Sending snapshot refresh request', requestBody);
+
+                const response = await fetch(`/api/snapshots/${selectedDistrictId}/refresh`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const result = await response.json();
+
+                addLog('Snapshot refresh response received', result, response.ok ? 'success' : 'error');
+
+                if (result.success) {
+                    currentSnapshotSession = result.session_id;
+                    addLog('Snapshot refresh started successfully', { session_id: result.session_id }, 'success');
+
+                    // Immediately update UI to show fetching state
+                    displaySnapshotStatus({
+                        status: 'fetching',
+                        snapshot_date: result.date,
+                        started_at: new Date().toISOString()
+                    });
+
+                    // Start polling
+                    startSnapshotPolling();
+
+                    alert('Snapshot refresh started! This may take several minutes. The page will update automatically when complete.');
+                } else {
+                    addLog('Snapshot refresh failed', { message: result.message }, 'error');
+
+                    if (response.status === 409) {
+                        alert('A snapshot refresh is already in progress. Please wait for it to complete.');
+                    } else {
+                        alert('Failed to start snapshot refresh: ' + (result.message || 'Unknown error'));
+                    }
+                }
+            } catch (error) {
+                addLog('Snapshot refresh request failed', { error: error.message }, 'error');
+                alert('Error requesting snapshot refresh: ' + error.message);
+            }
         }
 
         // Search for parent (handles both direct parent search and student-based search)
@@ -1220,5 +1567,18 @@
             }
         });
     </script>
+
+    <!-- Snapshot Refresh Confirmation Modal -->
+    <div id="refresh-modal" class="modal-overlay">
+        <div class="modal-dialog">
+            <h3>Refresh Snapshot?</h3>
+            <p>This will fetch the latest data from ClassLink. The process may take several minutes depending on the size of the district.</p>
+            <p><strong>Current snapshot will remain usable during the fetch.</strong></p>
+            <div class="modal-buttons">
+                <button class="btn-modal cancel" onclick="closeRefreshModal()">Cancel</button>
+                <button class="btn-modal confirm" onclick="confirmRefreshSnapshot()">Refresh Now</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
